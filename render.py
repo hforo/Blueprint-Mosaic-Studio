@@ -89,12 +89,15 @@ def cell_position(row, column):
 # Drawing
 # ----------------------------------------------------------
 
-def draw_cell(draw, cell, font):
+def draw_cell(draw, cell, font, row_offset=0, col_offset=0):
     """
     Draw one colored module.
     """
 
-    x, y = cell_position(cell.row, cell.column)
+    x, y = cell_position(
+        cell.row - row_offset,
+        cell.column - col_offset,
+    )
 
     draw.rectangle(
         (
@@ -266,7 +269,7 @@ def draw_column_labels(draw, font, width):
 # Main Renderer
 # ----------------------------------------------------------
 
-def render_master(data):
+def render_master(project):
     """
     Render the complete master blueprint.
 
@@ -276,9 +279,9 @@ def render_master(data):
         Dictionary returned from image.process_image()
     """
 
-    width = data.width
-    height = data.height
-    grid = data.grid
+    width = project.width
+    height = project.height
+    grid = project.grid
 
     image_width = width * CELL_SIZE
     image_height = height * CELL_SIZE
@@ -352,7 +355,7 @@ def render_master(data):
     footer = (
         f"{PROJECT_NAME}   •   "
         f"{width} × {height} modules   •   "
-        f"{len(data.palette)} palette colors"
+        f"{len(project.palette)} palette colors"
     )
 
     draw.text(
