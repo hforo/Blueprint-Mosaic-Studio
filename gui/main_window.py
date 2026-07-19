@@ -126,14 +126,49 @@ class MainWindow(QMainWindow):
                 dither=self.sidebar.dither.isChecked(), crop_box=crop_box,
                 tile_size_inches=self.sidebar.tile_size.value(),
             )
-            render_master(project)
+            paint_plan = self.sidebar.create_paint_plan(
+                project.palette,
+                project.color_counts,
+            )
+            render_master(
+                project,
+                filename_tag="OriginalColors_Numbered",
+                title_suffix="Original Colors — Numbered Blueprint",
+            )
+            render_master(
+                project,
+                filename_tag="OriginalColors_NoCellLabels",
+                title_suffix="Original Colors — No Cell Labels",
+                show_labels=False,
+            )
+            render_master(
+                project,
+                color_overrides=paint_plan.color_overrides,
+                filename_tag="SherwinWilliams_Numbered",
+                palette_color_count=len(paint_plan.rows),
+                title_suffix="Sherwin-Williams — Numbered Blueprint",
+            )
+            render_master(
+                project,
+                color_overrides=paint_plan.color_overrides,
+                filename_tag="SherwinWilliams_NoCellLabels",
+                palette_color_count=len(paint_plan.rows),
+                title_suffix="Sherwin-Williams — No Cell Labels",
+                show_labels=False,
+            )
             render_pages(project)
         except (OSError, ValueError) as error:
             QMessageBox.critical(self, "Generation failed", str(error))
             self.message_label.setText("Blueprint generation failed")
         else:
-            self.sidebar.set_palette(project.palette, project.color_counts)
-            self.message_label.setText("Blueprint and printable pages generated")
+            self.sidebar.set_palette(
+                project.palette,
+                project.color_counts,
+                paint_plan,
+            )
+            self.message_label.setText(
+                "Original and Sherwin-Williams labeled/unlabeled blueprints generated"
+            )
         finally:
             QApplication.restoreOverrideCursor()
 

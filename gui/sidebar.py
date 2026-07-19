@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from color_matching import SherwinWilliamsMatcher
 from paint_estimation import PaintUsageEstimator
+from paint_plan import SherwinWilliamsPaintPlan
 
 
 RGB = tuple[int, int, int]
@@ -21,9 +22,9 @@ RGB = tuple[int, int, int]
 class PalettePanel(QWidget):
     """Number-to-color legend for the currently generated mosaic."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, matcher: SherwinWilliamsMatcher, parent=None) -> None:
         super().__init__(parent)
-        self.matcher = SherwinWilliamsMatcher()
+        self.matcher = matcher
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         self.summary = QLabel("Generate a blueprint to see its color legend.")
@@ -126,12 +127,87 @@ class PalettePanel(QWidget):
             self.table.setRowHeight(row, 46)
 
         total_estimate = paint_estimator.estimate(total_tiles)
+        total_estimate_text = total_estimate.display_text().replace("\n", " · ")
         self.summary.setText(
             f"{len(palette)} colors · {total_tiles:,} numbered squares\n"
-            f"Estimated coating: {total_estimate.display_text().replace(chr(10), ' · ')}\n"
+            f"Estimated coating: {total_estimate_text}\n"
             f"Assumptions: 4 cartridges/square · "
             f"{paint_estimator.coverage_sq_ft_per_gallon:.0f} ft²/gal · "
             f"{paint_estimator.process_factor:.2f}× dip/waste"
+        )
+        self.table.setUpdatesEnabled(True)
+
+
+class SummaryPanel(QWidget):
+    """Aggregated Sherwin-Williams purchasing and paint-use summary."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        self.summary = QLabel("Generate a blueprint to create a paint summary.")
+        self.summary.setWordWrap(True)
+        layout.addWidget(self.summary)
+
+        self.table = QTableWidget(0, 6, self)
+        self.table.setHorizontalHeaderLabels(
+            ["Color", "Sherwin-Williams", "Mosaic #", "Tiles", "Paint", "Cost"]
+        )
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.verticalHeader().setVisible(False)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(0, 50)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self.table, 1)
+
+        note = QLabel(
+            "Cost is proportional paint consumed at the configured gallon price. "
+            "It excludes minimum container sizes, tint/base differences, tax, and "
+            "paint retained in the dipping vessel."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color: palette(mid); font-size: 11px;")
+        layout.addWidget(note)
+
+    def set_plan(self, plan: SherwinWilliamsPaintPlan) -> None:
+        self.table.setUpdatesEnabled(False)
+        self.table.setRowCount(len(plan.rows))
+        total_tiles = 0
+        for row_index, row in enumerate(plan.rows):
+            swatch = QTableWidgetItem()
+            swatch.setBackground(QColor(*row.paint.rgb))
+            paint_name = QTableWidgetItem(
+                f"{row.paint.display_code} · {row.paint.name}\n"
+                f"{row.paint.hex_value}"
+            )
+            numbers = QTableWidgetItem(row.palette_numbers_text)
+            tiles = QTableWidgetItem(f"{row.tile_count:,}")
+            tiles.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+            amount = QTableWidgetItem(row.estimate.display_text())
+            amount.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+            cost = QTableWidgetItem(f"${row.estimated_cost:,.2f}")
+            cost.setTextAlignment(Qt.AlignmentFlag.AlignRight)
+            for column, item in enumerate(
+                (swatch, paint_name, numbers, tiles, amount, cost)
+            ):
+                self.table.setItem(row_index, column, item)
+            self.table.setRowHeight(row_index, 46)
+            total_tiles += row.tile_count
+
+        total_amount = plan.total_estimate.display_text().replace("\n", " · ")
+        self.summary.setText(
+            f"{len(plan.rows)} different Sherwin-Williams colors\n"
+            f"{total_tiles:,} numbered squares · {total_amount}\n"
+            f"Estimated proportional paint cost: "
+            f"${plan.total_estimated_cost:,.2f} at "
+            f"${plan.price_per_gallon:,.2f}/gal"
         )
         self.table.setUpdatesEnabled(True)
 
@@ -195,6 +271,18 @@ class SettingsPanel(QWidget):
             "Multiplier for dipping, drainage, transfer loss, and waste"
         )
         form.addRow("Dip/waste factor", self.paint_process_factor)
+        self.paint_price = QDoubleSpinBox()
+        self.paint_price.setRange(0.0, 1000.0)
+        self.paint_price.setDecimals(2)
+        self.paint_price.setSingleStep(5.0)
+        self.paint_price.setValue(64.0)
+        self.paint_price.setPrefix("$")
+        self.paint_price.setSuffix(" / gal")
+        self.paint_price.setToolTip(
+            "Planning assumption only; enter the actual price of your chosen "
+            "paint product and finish"
+        )
+        form.addRow("Paint price", self.paint_price)
         layout.addWidget(settings)
 
         self.generate = QPushButton("Generate Blueprint")
@@ -209,10 +297,13 @@ class Sidebar(QTabWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setFixedWidth(620)
+        self.matcher = SherwinWilliamsMatcher()
         self.settings_panel = SettingsPanel(self)
-        self.palette_panel = PalettePanel(self)
+        self.palette_panel = PalettePanel(self.matcher, self)
+        self.summary_panel = SummaryPanel(self)
         self.addTab(self.settings_panel, "Settings")
         self.addTab(self.palette_panel, "Colors")
+        self.addTab(self.summary_panel, "Summary")
 
         # Preserve the concise control API used by MainWindow.
         self.grid = self.settings_panel.grid
@@ -222,16 +313,37 @@ class Sidebar(QTabWidget):
         self.dither = self.settings_panel.dither
         self.paint_coverage = self.settings_panel.paint_coverage
         self.paint_process_factor = self.settings_panel.paint_process_factor
+        self.paint_price = self.settings_panel.paint_price
         self.generate = self.settings_panel.generate
 
     def set_palette(
         self,
         palette: Mapping[int, RGB],
         color_counts: Mapping[int, int],
+        paint_plan: SherwinWilliamsPaintPlan | None = None,
     ) -> None:
-        estimator = PaintUsageEstimator(
+        estimator = self.paint_estimator()
+        if paint_plan is None:
+            paint_plan = self.create_paint_plan(palette, color_counts)
+        self.palette_panel.set_palette(palette, color_counts, estimator)
+        self.summary_panel.set_plan(paint_plan)
+        self.setCurrentWidget(self.summary_panel)
+
+    def paint_estimator(self) -> PaintUsageEstimator:
+        return PaintUsageEstimator(
             coverage_sq_ft_per_gallon=self.paint_coverage.value(),
             process_factor=self.paint_process_factor.value(),
         )
-        self.palette_panel.set_palette(palette, color_counts, estimator)
-        self.setCurrentWidget(self.palette_panel)
+
+    def create_paint_plan(
+        self,
+        palette: Mapping[int, RGB],
+        color_counts: Mapping[int, int],
+    ) -> SherwinWilliamsPaintPlan:
+        return SherwinWilliamsPaintPlan.build(
+            palette,
+            color_counts,
+            self.matcher,
+            self.paint_estimator(),
+            self.paint_price.value(),
+        )

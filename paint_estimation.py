@@ -16,6 +16,11 @@ class PaintEstimate:
     fluid_ounces: float
     gallons: float
 
+    def estimated_cost(self, price_per_gallon: float) -> float:
+        if price_per_gallon < 0:
+            raise ValueError("Paint price cannot be negative.")
+        return self.gallons * price_per_gallon
+
     def display_text(self) -> str:
         if self.milliliters >= 1000:
             metric = f"{self.milliliters / 1000:.2f} L"

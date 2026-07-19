@@ -97,7 +97,15 @@ def cell_position(row, column):
 # Drawing
 # ----------------------------------------------------------
 
-def draw_cell(draw, cell, font, row_offset=0, col_offset=0):
+def draw_cell(
+    draw,
+    cell,
+    font,
+    row_offset=0,
+    col_offset=0,
+    fill_rgb=None,
+    show_label=True,
+):
     """
     Draw one colored module.
     """
@@ -107,6 +115,7 @@ def draw_cell(draw, cell, font, row_offset=0, col_offset=0):
         cell.column - col_offset,
     )
 
+    display_rgb = fill_rgb if fill_rgb is not None else cell.rgb
     draw.rectangle(
         (
             x,
@@ -114,8 +123,11 @@ def draw_cell(draw, cell, font, row_offset=0, col_offset=0):
             x + CELL_SIZE,
             y + CELL_SIZE,
         ),
-        fill=cell.rgb,
+        fill=display_rgb,
     )
+
+    if not show_label:
+        return
 
     label = str(cell.color)
 
@@ -134,7 +146,7 @@ def draw_cell(draw, cell, font, row_offset=0, col_offset=0):
     draw.text(
         (tx, ty),
         label,
-        fill=text_color(cell.rgb),
+        fill=text_color(display_rgb),
         font=font,
     )
 
@@ -194,16 +206,26 @@ def draw_grid(draw, width, height):
         )
 
 
-def draw_title(draw, title_font, header_font, image_width, project):
+def draw_title(
+    draw,
+    title_font,
+    header_font,
+    image_width,
+    project,
+    title_suffix=None,
+):
     """
     Draw project title and project statistics.
     """
 
     center = BORDER + image_width // 2
 
+    title = PROJECT_NAME
+    if title_suffix:
+        title = f"{title} — {title_suffix}"
     draw.text(
         (center, 15),
-        PROJECT_NAME,
+        title,
         anchor="ma",
         font=title_font,
         fill="black",
@@ -282,9 +304,14 @@ def draw_column_labels(draw, font, width, col_offset=0):
 # ----------------------------------------------------------
 
 
-def blueprint_output_path(project) -> Path:
+def blueprint_output_path(
+    project,
+    color_count=None,
+    filename_tag=None,
+) -> Path:
     """Return a descriptive output path for a generated master blueprint."""
-    color_count = len(project.palette)
+    if color_count is None:
+        color_count = len(set(project.palette.values()))
     source_stem = (
         project.source_path.stem
         if project.source_path is not None
@@ -294,14 +321,31 @@ def blueprint_output_path(project) -> Path:
         "_" if character in '<>:"/\\|?*' else character
         for character in source_stem
     ).strip(" .") or "image"
+    safe_tag = ""
+    if filename_tag:
+        cleaned_tag = "".join(
+            "_" if character in '<>:"/\\|?*' else character
+            for character in filename_tag
+        ).strip(" .")
+        if cleaned_tag:
+            safe_tag = f"_{cleaned_tag}"
     filename = (
-        f"{MASTER_BLUEPRINT.stem}_{safe_source_stem}_{color_count}colors_"
+        f"{MASTER_BLUEPRINT.stem}_{safe_source_stem}{safe_tag}_"
+        f"{color_count}colors_"
         f"{project.width}x{project.height}{MASTER_BLUEPRINT.suffix}"
     )
     return MASTER_BLUEPRINT.with_name(filename)
 
 
-def render_master(project):
+def render_master(
+    project,
+    color_overrides=None,
+    filename_tag=None,
+    palette_color_count=None,
+    title_suffix=None,
+    show_labels=True,
+    show_annotations=True,
+):
     """
     Render the complete master blueprint.
 
@@ -336,13 +380,15 @@ def render_master(project):
     # Title
     # ------------------------------------------------------
 
-    draw_title(
-        draw,
-        title_font,
-        header_font,
-        image_width,
-        project,
-    )
+    if show_annotations:
+        draw_title(
+            draw,
+            title_font,
+            header_font,
+            image_width,
+            project,
+            title_suffix=title_suffix,
+        )
 
     # ------------------------------------------------------
     # Cells
@@ -354,6 +400,12 @@ def render_master(project):
                 draw,
                 cell,
                 cell_font,
+                fill_rgb=(
+                    color_overrides.get(cell.color)
+                    if color_overrides is not None
+                    else None
+                ),
+                show_label=show_labels,
             )
 
     # ------------------------------------------------------
@@ -370,43 +422,57 @@ def render_master(project):
     # Labels
     # ------------------------------------------------------
 
-    draw_row_labels(
-        draw,
-        header_font,
-        height,
-    )
+    if show_labels:
+        draw_row_labels(
+            draw,
+            header_font,
+            height,
+        )
 
-    draw_column_labels(
-        draw,
-        coordinate_font,
-        width,
-    )
+        draw_column_labels(
+            draw,
+            coordinate_font,
+            width,
+        )
 
     # ------------------------------------------------------
     # Footer
     # ------------------------------------------------------
 
+    display_color_count = (
+        palette_color_count
+        if palette_color_count is not None
+        else len(set(project.palette.values()))
+    )
+    footer_name = PROJECT_NAME
+    if title_suffix:
+        footer_name = f"{footer_name} — {title_suffix}"
     footer = (
-        f"{PROJECT_NAME}   •   "
+        f"{footer_name}   •   "
         f"{width} × {height} modules   •   "
-        f"{len(project.palette)} palette colors"
+        f"{display_color_count} palette colors"
     )
 
-    draw.text(
-        (
-            BORDER,
-            image_height + BORDER + 25,
-        ),
-        footer,
-        font=header_font,
-        fill="black",
-    )
+    if show_annotations:
+        draw.text(
+            (
+                BORDER,
+                image_height + BORDER + 25,
+            ),
+            footer,
+            font=header_font,
+            fill="black",
+        )
 
     # ------------------------------------------------------
     # Save
     # ------------------------------------------------------
 
-    output_path = blueprint_output_path(project)
+    output_path = blueprint_output_path(
+        project,
+        color_count=display_color_count,
+        filename_tag=filename_tag,
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output_path, optimize=True)
 
