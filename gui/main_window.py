@@ -124,6 +124,7 @@ class MainWindow(QMainWindow):
                 Path(image_path), grid_width, grid_height,
                 self.sidebar.colors.value(),
                 dither=self.sidebar.dither.isChecked(), crop_box=crop_box,
+                tile_size_inches=self.sidebar.tile_size.value(),
             )
             render_master(project)
             render_pages(project)
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Generation failed", str(error))
             self.message_label.setText("Blueprint generation failed")
         else:
+            self.sidebar.set_palette(project.palette, project.color_counts)
             self.message_label.setText("Blueprint and printable pages generated")
         finally:
             QApplication.restoreOverrideCursor()
@@ -169,4 +171,3 @@ class MainWindow(QMainWindow):
             self, "About Blueprint Mosaic Studio",
             "Blueprint Mosaic Studio\nInteractive mosaic editor — Milestone 1",
         )
-

@@ -5,6 +5,7 @@ Data models used by the Cartridge Mosaic Generator.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 RGB = Tuple[int, int, int]
@@ -33,3 +34,13 @@ class MosaicProject:
     palette: Dict[int, RGB]
     color_counts: Dict[int, int]
     grid: List[List[Cell]]
+    source_path: Path | None = None
+    tile_size_inches: float = 0.75
+
+    @property
+    def finished_width_inches(self) -> float:
+        return self.width * self.tile_size_inches
+
+    @property
+    def finished_height_inches(self) -> float:
+        return self.height * self.tile_size_inches

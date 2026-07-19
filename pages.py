@@ -17,6 +17,7 @@ from render import (
     draw_column_labels,
     draw_grid,
     draw_row_labels,
+    load_coordinate_font,
     load_fonts,
 )
 
@@ -25,6 +26,7 @@ def render_pages(project) -> None:
     """Render the project's grid as a set of printable PNG pages."""
     PAGES_FOLDER.mkdir(exist_ok=True)
     title_font, header_font, cell_font = load_fonts()
+    coordinate_font = load_coordinate_font()
     page_columns = ceil(project.width / PAGE_COLUMNS)
     page_rows = ceil(project.height / PAGE_ROWS)
     total_pages = page_columns * page_rows
@@ -72,8 +74,18 @@ def render_pages(project) -> None:
                         col_offset=start_column,
                     )
             draw_grid(draw, width, height)
-            draw_row_labels(draw, header_font, height)
-            draw_column_labels(draw, header_font, width)
+            draw_row_labels(
+                draw,
+                cell_font,
+                height,
+                row_offset=start_row,
+            )
+            draw_column_labels(
+                draw,
+                coordinate_font,
+                width,
+                col_offset=start_column,
+            )
             canvas.save(
                 PAGES_FOLDER / f"Page_{page_number:02}.png",
                 optimize=True,

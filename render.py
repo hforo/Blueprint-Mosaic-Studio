@@ -20,7 +20,6 @@ from config import (
     TITLE_FONT_SIZE,
     HEADER_FONT_SIZE,
     CELL_FONT_SIZE,
-    MODULE_SIZE_INCHES,
     CARTRIDGES_PER_MODULE,
 )
 
@@ -53,6 +52,17 @@ def load_fonts():
     default = ImageFont.load_default()
 
     return default, default, default
+
+
+def load_coordinate_font():
+    """Load a compact font whose two-letter labels fit inside one grid cell."""
+    font_size = max(8, CELL_SIZE // 2)
+    for font_name in ("arial.ttf", "Arial.ttf", "DejaVuSans.ttf"):
+        try:
+            return ImageFont.truetype(font_name, font_size)
+        except OSError:
+            pass
+    return ImageFont.load_default()
 
 
 # ----------------------------------------------------------
@@ -201,8 +211,8 @@ def draw_title(draw, title_font, header_font, image_width, project):
 
     total_modules = project.width * project.height
     total_cartridges = total_modules * CARTRIDGES_PER_MODULE
-    finished_width = project.width * MODULE_SIZE_INCHES
-    finished_height = project.height * MODULE_SIZE_INCHES
+    finished_width = project.finished_width_inches
+    finished_height = project.finished_height_inches
     stats = (
         f"{total_modules:,} Modules   |   "
         f"{total_cartridges:,} Cartridges   |   "
@@ -218,7 +228,7 @@ def draw_title(draw, title_font, header_font, image_width, project):
     )
 
 
-def draw_row_labels(draw, font, height):
+def draw_row_labels(draw, font, height, row_offset=0):
     """
     Draw row numbers.
     """
@@ -229,7 +239,7 @@ def draw_row_labels(draw, font, height):
 
         draw.text(
             (BORDER - 12, y),
-            str(row + 1),
+            str(row + row_offset + 1),
             anchor="rm",
             font=font,
             fill="black",
@@ -250,7 +260,7 @@ def excel_column_name(index):
     return result
 
 
-def draw_column_labels(draw, font, width):
+def draw_column_labels(draw, font, width, col_offset=0):
     """
     Draw column letters.
     """
@@ -260,8 +270,8 @@ def draw_column_labels(draw, font, width):
         x = BORDER + col * CELL_SIZE + CELL_SIZE / 2
 
         draw.text(
-            (x, BORDER - 12),
-            excel_column_name(col),
+            (x, BORDER - 4),
+            excel_column_name(col + col_offset),
             anchor="ms",
             font=font,
             fill="black",
@@ -270,6 +280,26 @@ def draw_column_labels(draw, font, width):
         # ----------------------------------------------------------
 # Main Renderer
 # ----------------------------------------------------------
+
+
+def blueprint_output_path(project) -> Path:
+    """Return a descriptive output path for a generated master blueprint."""
+    color_count = len(project.palette)
+    source_stem = (
+        project.source_path.stem
+        if project.source_path is not None
+        else "image"
+    )
+    safe_source_stem = "".join(
+        "_" if character in '<>:"/\\|?*' else character
+        for character in source_stem
+    ).strip(" .") or "image"
+    filename = (
+        f"{MASTER_BLUEPRINT.stem}_{safe_source_stem}_{color_count}colors_"
+        f"{project.width}x{project.height}{MASTER_BLUEPRINT.suffix}"
+    )
+    return MASTER_BLUEPRINT.with_name(filename)
+
 
 def render_master(project):
     """
@@ -300,6 +330,7 @@ def render_master(project):
     draw = ImageDraw.Draw(canvas)
 
     title_font, header_font, cell_font = load_fonts()
+    coordinate_font = load_coordinate_font()
 
     # ------------------------------------------------------
     # Title
@@ -347,7 +378,7 @@ def render_master(project):
 
     draw_column_labels(
         draw,
-        header_font,
+        coordinate_font,
         width,
     )
 
@@ -375,15 +406,14 @@ def render_master(project):
     # Save
     # ------------------------------------------------------
 
-    canvas.save(
-        MASTER_BLUEPRINT,
-        optimize=True,
-    )
+    output_path = blueprint_output_path(project)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(output_path, optimize=True)
 
     print()
     print("=" * 60)
     print("Blueprint created successfully!")
-    print(f"Saved to: {MASTER_BLUEPRINT}")
+    print(f"Saved to: {output_path}")
     print(f"Image size: {canvas.width:,} x {canvas.height:,} pixels")
     print("=" * 60)
     print()

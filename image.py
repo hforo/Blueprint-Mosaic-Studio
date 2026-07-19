@@ -178,6 +178,7 @@ def process_image(
     colors: int,
     dither: bool = False,
     crop_box: CropBox | None = None,
+    tile_size_inches: float = 0.75,
 ) -> MosaicProject:
     """Load and process an image while preserving the established pipeline.
 
@@ -185,6 +186,9 @@ def process_image(
     crop selection at this boundary lets the editor remain independent of the
     renderer and makes project serialization straightforward later.
     """
+
+    if tile_size_inches <= 0:
+        raise ValueError("Tile size must be greater than zero.")
 
     original = load_image(Path(filename))
     if crop_box is not None:
@@ -232,4 +236,6 @@ def process_image(
         palette=palette,
         color_counts=counts,
         grid=grid,
+        source_path=Path(filename).resolve(),
+        tile_size_inches=tile_size_inches,
     )
