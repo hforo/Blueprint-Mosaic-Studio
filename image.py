@@ -7,9 +7,13 @@ Image processing for the Cartridge Mosaic Generator.
 from collections import Counter
 from models import Cell, MosaicProject
 from pathlib import Path
+from typing import TypeAlias
 
 import numpy as np
 from PIL import Image
+
+
+CropBox: TypeAlias = tuple[int, int, int, int]
 
 
 # ---------------------------------------------------------
@@ -93,13 +97,15 @@ def quantize_image(
 def extract_palette(
     palette_image: Image.Image,
     colors: int,
-):
+) -> dict[int, tuple[int, int, int]]:
 
     raw = palette_image.getpalette()
 
     palette = {}
 
-    for i in range(colors):
+    available_colors = min(colors, len(raw) // 3)
+
+    for i in range(available_colors):
 
         palette[i + 1] = (
 
@@ -166,14 +172,28 @@ def build_grid(index_map, palette):
 # ---------------------------------------------------------
 
 def process_image(
-    filename,
-    width,
-    height,
-    colors,
-    dither=False,
-):
+    filename: str | Path,
+    width: int,
+    height: int,
+    colors: int,
+    dither: bool = False,
+    crop_box: CropBox | None = None,
+) -> MosaicProject:
+    """Load and process an image while preserving the established pipeline.
 
-    original = load_image(filename)
+    ``crop_box`` uses Pillow's left/top/right/bottom pixel coordinates.  Keeping
+    crop selection at this boundary lets the editor remain independent of the
+    renderer and makes project serialization straightforward later.
+    """
+
+    original = load_image(Path(filename))
+    if crop_box is not None:
+        left, top, right, bottom = crop_box
+        if left < 0 or top < 0 or right > original.width or bottom > original.height:
+            raise ValueError("Crop rectangle lies outside the source image.")
+        if right <= left or bottom <= top:
+            raise ValueError("Crop rectangle must have a positive size.")
+        original = original.crop(crop_box)
 
     resized = resize_image(
         original,
@@ -202,14 +222,14 @@ def process_image(
     )
 
     return MosaicProject(
-    original=original,
-    resized=resized,
-    palette_image=palette_image,
-    rgb_image=rgb_image,
-    width=width,
-    height=height,
-    colors=colors,
-    palette=palette,
-    color_counts=counts,
-    grid=grid,
-)
+        original=original,
+        resized=resized,
+        palette_image=palette_image,
+        rgb_image=rgb_image,
+        width=width,
+        height=height,
+        colors=len(palette),
+        palette=palette,
+        color_counts=counts,
+        grid=grid,
+    )

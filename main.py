@@ -1,21 +1,21 @@
-from config import *
-from image import process_image
-from render import render_master
-from pages import render_pages
+import sys
+
+from PySide6.QtWidgets import QApplication
+
+from gui.main_window import MainWindow
 
 
-def main():
+def main() -> int:
+    app = QApplication(sys.argv)
 
-    project = process_image(
-        IMAGE_FILE,
-        GRID_WIDTH,
-        GRID_HEIGHT,
-        NUMBER_OF_COLORS,
-    )
+    app.setApplicationName("Blueprint Mosaic Studio")
+    app.setOrganizationName("Blueprint Mosaic Studio")
 
-    render_master(project)
-    render_pages(project)
+    window = MainWindow()
+    window.show()
+
+    return app.exec()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

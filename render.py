@@ -20,10 +20,8 @@ from config import (
     TITLE_FONT_SIZE,
     HEADER_FONT_SIZE,
     CELL_FONT_SIZE,
-    FINISHED_WIDTH,
-    FINISHED_HEIGHT,
-    TOTAL_MODULES,
-    TOTAL_CARTRIDGES,
+    MODULE_SIZE_INCHES,
+    CARTRIDGES_PER_MODULE,
 )
 
 
@@ -186,7 +184,7 @@ def draw_grid(draw, width, height):
         )
 
 
-def draw_title(draw, title_font, header_font, image_width):
+def draw_title(draw, title_font, header_font, image_width, project):
     """
     Draw project title and project statistics.
     """
@@ -201,10 +199,14 @@ def draw_title(draw, title_font, header_font, image_width):
         fill="black",
     )
 
+    total_modules = project.width * project.height
+    total_cartridges = total_modules * CARTRIDGES_PER_MODULE
+    finished_width = project.width * MODULE_SIZE_INCHES
+    finished_height = project.height * MODULE_SIZE_INCHES
     stats = (
-        f"{TOTAL_MODULES:,} Modules   |   "
-        f"{TOTAL_CARTRIDGES:,} Cartridges   |   "
-        f"{FINISHED_WIDTH:.1f}\" × {FINISHED_HEIGHT:.1f}\""
+        f"{total_modules:,} Modules   |   "
+        f"{total_cartridges:,} Cartridges   |   "
+        f"{finished_width:.1f}\" × {finished_height:.1f}\""
     )
 
     draw.text(
@@ -308,6 +310,7 @@ def render_master(project):
         title_font,
         header_font,
         image_width,
+        project,
     )
 
     # ------------------------------------------------------
