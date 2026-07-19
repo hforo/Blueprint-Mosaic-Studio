@@ -5,8 +5,16 @@ Global configuration for the Cartridge Mosaic Generator.
 """
 
 from pathlib import Path
+
+# Printable page settings
+
 PAGE_COLUMNS = 24
 PAGE_ROWS = 20
+
+PAGE_MARGIN = 100
+PAGE_CELL_SIZE = 40
+
+PAGE_TITLE_HEIGHT = 80
 
 TOTAL_PAGE_COLUMNS = (GRID_WIDTH + PAGE_COLUMNS - 1) // PAGE_COLUMNS
 TOTAL_PAGE_ROWS = (GRID_HEIGHT + PAGE_ROWS - 1) // PAGE_ROWS
