@@ -232,12 +232,15 @@ def render_location_thumbnail(
                 for cell in row
             ]
         )
-    if project.tile_type in (
+    shaped_tiles = project.tile_type in (
         "Round disc — one face",
         "Sphere — all surface",
         "4-piece 5.56 cartridge tile",
-    ):
-        shape_scale = 4
+    )
+    if shaped_tiles:
+        # Render generously before reduction so circular silhouettes and the
+        # gaps between four-piece groups survive overview-thumbnail scaling.
+        shape_scale = 12
         shaped_source = Image.new(
             "RGB",
             (project.width * shape_scale, project.height * shape_scale),
@@ -259,7 +262,11 @@ def render_location_thumbnail(
                     project.tile_type,
                 )
         source = shaped_source
-    contained = ImageOps.contain(source, OVERVIEW_SIZE, Image.Resampling.NEAREST)
+    contained = ImageOps.contain(
+        source,
+        OVERVIEW_SIZE,
+        Image.Resampling.LANCZOS if shaped_tiles else Image.Resampling.NEAREST,
+    )
     overview = Image.new("RGB", OVERVIEW_SIZE, (235, 235, 235))
     offset_x = (OVERVIEW_SIZE[0] - contained.width) // 2
     offset_y = (OVERVIEW_SIZE[1] - contained.height) // 2
