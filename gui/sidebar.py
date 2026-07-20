@@ -11,7 +11,7 @@ from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QDoubleSpinBox, QFileDialog, QHeaderView, QMessageBox, QPushButton, QSpinBox,
-    QTabWidget, QTableWidget,
+    QScrollArea, QTabWidget, QTableWidget,
     QListWidget, QListWidgetItem, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -510,7 +510,15 @@ class SettingsPanel(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.scroll_content = QWidget(self.scroll_area)
+        layout = QVBoxLayout(self.scroll_content)
+        self.scroll_area.setWidget(self.scroll_content)
+        outer_layout.addWidget(self.scroll_area)
         heading = QLabel("Mosaic Settings")
         heading.setStyleSheet("font-size: 18px; font-weight: 600;")
         layout.addWidget(heading)
