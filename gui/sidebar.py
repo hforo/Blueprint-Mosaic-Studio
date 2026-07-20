@@ -16,7 +16,10 @@ from PySide6.QtWidgets import (
 )
 
 from color_matching import SherwinWilliamsMatcher
-from paint_estimation import PaintUsageEstimator, container_plan_text
+from paint_estimation import (
+    PaintUsageEstimator, container_plan_text,
+    vertical_556_cartridge_surface_area_sq_in,
+)
 from paint_plan import SherwinWilliamsPaintPlan
 from pages import PageSection
 
@@ -676,8 +679,9 @@ class SettingsPanel(QWidget):
             "Cube / block — all faces": 6 * tile_width ** 2,
             "Round disc — one face": pi * (tile_width / 2) ** 2,
             "Sphere — all surface": pi * tile_width ** 2,
-            # Four complete cartridges at 0.018 square feet each.
-            "4-piece 5.56 cartridge tile": 4 * 0.018 * 144,
+            "4-piece 5.56 cartridge tile": (
+                vertical_556_cartridge_surface_area_sq_in(4)
+            ),
         }
         if tile_type in areas:
             self.tile_surface_area.setValue(areas[tile_type])

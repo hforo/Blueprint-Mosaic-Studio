@@ -1,12 +1,40 @@
 """Paint-consumption estimates for square-tile mosaic production."""
 
 from dataclasses import dataclass
-from math import ceil
+from math import ceil, pi
 
 
 MILLILITERS_PER_GALLON = 3785.411784
 FLUID_OUNCES_PER_GALLON = 128.0
 STANDARD_CONTAINER_OUNCES = (("gallon", 128.0), ("quart", 32.0), ("sample", 8.0))
+MM_PER_INCH = 25.4
+CARTRIDGE_556_CASE_LENGTH_MM = 44.70
+CARTRIDGE_556_OVERALL_LENGTH_MM = 57.40
+CARTRIDGE_556_CASE_DIAMETER_MM = 9.58
+CARTRIDGE_556_PROJECTILE_DIAMETER_MM = 5.70
+
+
+def vertical_556_cartridge_surface_area_sq_in(quantity: int = 4) -> float:
+    """Approximate the complete exterior area of upright 5.56 cartridges.
+
+    Each piece is modeled as a case cylinder plus an exposed-projectile
+    cylinder. The circular base and tip are included. Point contacts between
+    adjacent vertical pieces do not remove measurable coated area.
+    """
+    if quantity <= 0:
+        raise ValueError("Cartridge quantity must be positive.")
+    exposed_projectile_length = (
+        CARTRIDGE_556_OVERALL_LENGTH_MM - CARTRIDGE_556_CASE_LENGTH_MM
+    )
+    lateral_case = (
+        pi * CARTRIDGE_556_CASE_DIAMETER_MM * CARTRIDGE_556_CASE_LENGTH_MM
+    )
+    lateral_projectile = (
+        pi * CARTRIDGE_556_PROJECTILE_DIAMETER_MM * exposed_projectile_length
+    )
+    base = pi * (CARTRIDGE_556_CASE_DIAMETER_MM / 2) ** 2
+    tip = pi * (CARTRIDGE_556_PROJECTILE_DIAMETER_MM / 2) ** 2
+    return quantity * (lateral_case + lateral_projectile + base + tip) / MM_PER_INCH ** 2
 
 
 def container_plan(fluid_ounces: float) -> tuple[tuple[str, int], ...]:
