@@ -63,6 +63,7 @@ def render_pages(
     color_overrides=None,
     color_label: str | None = None,
     label_overrides=None,
+    paint_plan=None,
 ) -> list[PageSection]:
     """Render printable pages with a full-mosaic location overview."""
     PAGES_FOLDER.mkdir(exist_ok=True)
@@ -71,6 +72,7 @@ def render_pages(
     title_font, header_font, _ = load_fonts()
     cell_font = load_sized_font(max(14, PAGE_CELL_SIZE // 3))
     coordinate_font = load_coordinate_font(PAGE_CELL_SIZE)
+    legend_font = load_sized_font(13)
     page_columns = ceil(project.width / PAGE_COLUMNS)
     page_rows = ceil(project.height / PAGE_ROWS)
     total_pages = page_columns * page_rows
@@ -87,11 +89,35 @@ def render_pages(
             height = end_row - start_row
             page_border = PAGE_TITLE_HEIGHT
             grid_width = width * PAGE_CELL_SIZE + page_border * 2
+            page_palette_numbers = {
+                project.grid[row][column].color
+                for row in range(start_row, end_row)
+                for column in range(start_column, end_column)
+            }
+            legend_entries = []
+            if paint_plan is not None and label_overrides is not None:
+                for blueprint_number, plan_row in enumerate(
+                    paint_plan.rows, start=1,
+                ):
+                    if page_palette_numbers.intersection(plan_row.palette_numbers):
+                        legend_entries.append((blueprint_number, plan_row))
+            canvas_height = height * PAGE_CELL_SIZE + page_border * 2
+            legend_start_y = 350
+            legend_row_height = 24
+            legend_rows = max(
+                1, (canvas_height - legend_start_y - 20) // legend_row_height,
+            )
+            legend_columns = max(1, ceil(len(legend_entries) / legend_rows))
+            legend_column_width = 225
+            page_sidebar_width = max(
+                PAGE_SIDEBAR_WIDTH,
+                legend_columns * legend_column_width + 24,
+            )
             canvas = Image.new(
                 "RGB",
                 (
-                    grid_width + PAGE_SIDEBAR_WIDTH,
-                    height * PAGE_CELL_SIZE + page_border * 2,
+                    grid_width + page_sidebar_width,
+                    canvas_height,
                 ),
                 "white",
             )
@@ -215,6 +241,35 @@ def render_pages(
                 fill="black",
                 spacing=5,
             )
+            if legend_entries:
+                draw.text(
+                    (panel_x, legend_start_y - 30),
+                    "Paints used on this page",
+                    font=header_font,
+                    fill="black",
+                )
+                for index, (blueprint_number, plan_row) in enumerate(
+                    legend_entries,
+                ):
+                    legend_column = index // legend_rows
+                    legend_row = index % legend_rows
+                    legend_x = panel_x + legend_column * legend_column_width
+                    legend_y = legend_start_y + legend_row * legend_row_height
+                    draw.rectangle(
+                        (legend_x, legend_y, legend_x + 17, legend_y + 17),
+                        fill=plan_row.paint.rgb,
+                        outline="black",
+                    )
+                    paint_text = (
+                        f"{blueprint_number}  {plan_row.paint.display_code}  "
+                        f"{plan_row.paint.name}"
+                    )
+                    draw.text(
+                        (legend_x + 24, legend_y),
+                        paint_text[:32],
+                        font=legend_font,
+                        fill="black",
+                    )
 
             image_path = PAGES_FOLDER / f"Page_{page_number:02}.png"
             thumbnail_path = thumbnails_folder / f"Page_{page_number:02}.png"

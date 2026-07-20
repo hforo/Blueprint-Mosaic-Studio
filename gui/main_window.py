@@ -274,6 +274,12 @@ class MainWindow(QMainWindow):
         self.sidebar.pages_panel.next_requested.connect(
             lambda: self._navigate_page(1)
         )
+        self.sidebar.progress_panel.page_requested.connect(
+            self._open_progress_page
+        )
+        self.sidebar.progress_panel.completion_changed.connect(
+            self._on_progress_changed
+        )
         self.sidebar.currentChanged.connect(self._on_sidebar_tab_changed)
         self.sidebar.summary_panel.color_selected.connect(
             self._highlight_summary_color
@@ -354,6 +360,7 @@ class MainWindow(QMainWindow):
                 self._active_project = None
                 self._active_paint_plan = None
                 self._page_sections = []
+                self.sidebar.progress_panel.set_sections([])
                 self._active_page_section = None
                 self._numbered_preview_path = None
                 self._paint_numbered_preview_path = None
@@ -420,6 +427,9 @@ class MainWindow(QMainWindow):
                 if self._active_project is not None else None
             ),
             "last_page_index": self.sidebar.pages_panel.page_list.currentRow(),
+            "completed_pages": list(
+                self.sidebar.progress_panel.completed_pages()
+            ),
         }
 
     def _autosave_project(self) -> None:
@@ -469,6 +479,7 @@ class MainWindow(QMainWindow):
                 return
             self._active_project = None
             self._active_paint_plan = None
+            self.sidebar.progress_panel.set_sections([])
             settings = document.get("settings", {})
             self.sidebar.live_preview.setChecked(False)
             paint_company = str(settings.get("paint_company", ""))
@@ -542,6 +553,9 @@ class MainWindow(QMainWindow):
             page_list.blockSignals(True)
             page_list.setCurrentRow(page_index)
             page_list.blockSignals(False)
+        self.sidebar.progress_panel.set_completed_pages(
+            document.get("completed_pages", ())
+        )
         self.message_label.setText(f"Opened project {Path(filename).name}")
 
     def _grid_dimensions(self) -> tuple[int, int]:
@@ -805,6 +819,7 @@ class MainWindow(QMainWindow):
                 project,
                 color_overrides=paint_plan.color_overrides,
                 label_overrides=paint_plan.blueprint_labels,
+                paint_plan=paint_plan,
                 color_label=f"{paint_company} Build Page",
             )
             advance(7, "Updating summaries and page navigation...")
@@ -897,6 +912,20 @@ class MainWindow(QMainWindow):
         current = page_list.currentRow()
         target = min(max((current if current >= 0 else 0) + offset, 0), len(self._page_sections) - 1)
         self.sidebar.pages_panel.select_page(self._page_sections[target].image_path)
+
+    @Slot(str)
+    def _open_progress_page(self, image_path: str) -> None:
+        self.sidebar.setCurrentWidget(self.sidebar.pages_panel)
+        self.sidebar.pages_panel.select_page(image_path)
+
+    @Slot(object)
+    def _on_progress_changed(self, completed_pages: object) -> None:
+        complete = len(tuple(completed_pages))
+        total = self.sidebar.progress_panel.table.rowCount()
+        self.message_label.setText(
+            f"Build progress: {complete} of {total} pages complete"
+        )
+        self._autosave_project()
 
     @Slot(float)
     def _update_zoom_status(self, percentage: float) -> None:

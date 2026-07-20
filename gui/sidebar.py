@@ -536,6 +536,125 @@ class PagesPanel(QWidget):
                 self.page_selected.emit(str(image_path))
 
 
+class ProgressPanel(QWidget):
+    """Persistent page-level build checklist."""
+
+    completion_changed = Signal(object)
+    page_requested = Signal(str)
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._updating = False
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        heading = QLabel("Build Progress")
+        heading.setStyleSheet("font-size: 16px; font-weight: 600;")
+        layout.addWidget(heading)
+        self.status = QLabel("Generate a blueprint to start tracking progress.")
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        actions = QHBoxLayout()
+        self.mark_all = QPushButton("Mark all complete")
+        self.clear_all = QPushButton("Clear all")
+        actions.addWidget(self.mark_all)
+        actions.addWidget(self.clear_all)
+        layout.addLayout(actions)
+        self.table = QTableWidget(0, 3, self)
+        self.table.setHorizontalHeaderLabels(["Done", "Page", "Location"])
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.verticalHeader().setVisible(False)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table, 1)
+        hint = QLabel("Double-click a row to open that printable build page.")
+        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        layout.addWidget(hint)
+        self.table.itemChanged.connect(self._on_item_changed)
+        self.table.itemDoubleClicked.connect(self._open_page)
+        self.mark_all.clicked.connect(lambda: self._set_all(True))
+        self.clear_all.clicked.connect(lambda: self._set_all(False))
+
+    def set_sections(
+        self, sections: list[PageSection], completed_pages=(),
+    ) -> None:
+        completed = {int(number) for number in completed_pages}
+        self._updating = True
+        self.table.setRowCount(len(sections))
+        for row, section in enumerate(sections):
+            done = QTableWidgetItem()
+            done.setFlags(
+                Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsUserCheckable
+            )
+            done.setCheckState(
+                Qt.CheckState.Checked
+                if section.page_number in completed else Qt.CheckState.Unchecked
+            )
+            done.setData(Qt.ItemDataRole.UserRole, section.page_number)
+            page = QTableWidgetItem(section.title)
+            page.setData(Qt.ItemDataRole.UserRole, str(section.image_path))
+            location = QTableWidgetItem(section.location_text)
+            self.table.setItem(row, 0, done)
+            self.table.setItem(row, 1, page)
+            self.table.setItem(row, 2, location)
+        self._updating = False
+        self._update_status()
+
+    def completed_pages(self) -> tuple[int, ...]:
+        completed = []
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
+                completed.append(int(item.data(Qt.ItemDataRole.UserRole)))
+        return tuple(completed)
+
+    def set_completed_pages(self, page_numbers) -> None:
+        wanted = {int(number) for number in page_numbers}
+        self._updating = True
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None:
+                item.setCheckState(
+                    Qt.CheckState.Checked
+                    if int(item.data(Qt.ItemDataRole.UserRole)) in wanted
+                    else Qt.CheckState.Unchecked
+                )
+        self._updating = False
+        self._update_status()
+
+    def _set_all(self, complete: bool) -> None:
+        self.set_completed_pages(
+            range(1, self.table.rowCount() + 1) if complete else ()
+        )
+        self.completion_changed.emit(self.completed_pages())
+
+    def _on_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._updating or item.column() != 0:
+            return
+        self._update_status()
+        self.completion_changed.emit(self.completed_pages())
+
+    def _update_status(self) -> None:
+        total = self.table.rowCount()
+        complete = len(self.completed_pages())
+        percent = round(100 * complete / total) if total else 0
+        self.status.setText(
+            f"{complete} of {total} pages complete ({percent}%)"
+            if total else "Generate a blueprint to start tracking progress."
+        )
+
+    def _open_page(self, item: QTableWidgetItem) -> None:
+        page_item = self.table.item(item.row(), 1)
+        path = page_item.data(Qt.ItemDataRole.UserRole) if page_item else None
+        if path:
+            self.page_requested.emit(str(path))
+
+
 class SettingsPanel(QWidget):
     """Mosaic generation settings exposed as a reusable panel."""
 
@@ -779,10 +898,12 @@ class Sidebar(QTabWidget):
         self.palette_panel = PalettePanel(self.matcher, self)
         self.summary_panel = SummaryPanel(self)
         self.pages_panel = PagesPanel(self)
+        self.progress_panel = ProgressPanel(self)
         self.addTab(self.settings_panel, "Settings")
         self.addTab(self.palette_panel, "Colors")
         self.addTab(self.summary_panel, "Summary")
         self.addTab(self.pages_panel, "Pages")
+        self.addTab(self.progress_panel, "Progress")
         self.tabBar().installEventFilter(self)
 
         # Preserve the concise control API used by MainWindow.
@@ -844,6 +965,7 @@ class Sidebar(QTabWidget):
             self.palette_panel,
             self.summary_panel,
             self.pages_panel,
+            self.progress_panel,
         ):
             index = self.indexOf(panel)
             if index >= 0:
@@ -915,4 +1037,6 @@ class Sidebar(QTabWidget):
         )
 
     def set_pages(self, sections: list[PageSection]) -> None:
+        completed = self.progress_panel.completed_pages()
         self.pages_panel.set_sections(sections)
+        self.progress_panel.set_sections(sections, completed)
