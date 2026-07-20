@@ -133,6 +133,7 @@ class MainWindow(QMainWindow):
         self._page_sections = []
         self._active_page_section = None
         self._numbered_preview_path: Path | None = None
+        self._paint_numbered_preview_path: Path | None = None
         self._project_path: Path | None = None
         self._blueprint_stale = True
         self._sizing_sync = False
@@ -247,6 +248,7 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         self.sidebar.generate.clicked.connect(self.generate_blueprint)
+        self.sidebar.generate_pdf.clicked.connect(self.export_blueprint_pdf)
         self.canvas.zoom_changed.connect(self._update_zoom_status)
         self.canvas.image_changed.connect(self._update_image_status)
         self.canvas.crop_changed.connect(self._update_crop_status)
@@ -341,6 +343,7 @@ class MainWindow(QMainWindow):
                 self._page_sections = []
                 self._active_page_section = None
                 self._numbered_preview_path = None
+                self._paint_numbered_preview_path = None
                 self.sidebar.setCurrentWidget(self.sidebar.settings_panel)
                 self.sidebar.set_result_tabs_enabled(False)
                 self.sidebar.settings_panel.generation_status.setText(
@@ -755,6 +758,11 @@ class MainWindow(QMainWindow):
                 palette_color_count=len(paint_plan.rows),
                 title_suffix=f"{paint_company} — Numbered Blueprint",
             )
+            self._paint_numbered_preview_path = blueprint_output_path(
+                project,
+                color_count=len(paint_plan.rows),
+                filename_tag="SherwinWilliams_Numbered",
+            ).resolve()
             advance(5, f"Rendering clean {paint_company} blueprint...")
             render_master(
                 project,
@@ -836,7 +844,7 @@ class MainWindow(QMainWindow):
         if (
             self._active_project is None
             or self._active_paint_plan is None
-            or self._numbered_preview_path is None
+            or self._paint_numbered_preview_path is None
         ):
             QMessageBox.information(self, "Generate Blueprint", "Generate a blueprint before exporting a PDF.")
             return
@@ -848,10 +856,11 @@ class MainWindow(QMainWindow):
             return
         try:
             export_blueprint_pdf(
-                filename, self._numbered_preview_path,
+                filename, self._paint_numbered_preview_path,
                 [section.image_path for section in self._page_sections],
                 self._active_paint_plan,
                 self._active_project.source_path.name if self._active_project.source_path else "Blueprint",
+                self._active_project,
             )
         except OSError as error:
             QMessageBox.critical(self, "Export failed", str(error))

@@ -668,6 +668,14 @@ class SettingsPanel(QWidget):
         self.generate = QPushButton("Generate Blueprint")
         self.generate.setMinimumHeight(38)
         layout.addWidget(self.generate)
+        self.generate_pdf = QPushButton("Generate PDF Blueprint…")
+        self.generate_pdf.setMinimumHeight(34)
+        self.generate_pdf.setEnabled(False)
+        self.generate_pdf.setToolTip(
+            "Create a printable PDF containing the master blueprint, supplies "
+            "and cost sheets, and every detail build page."
+        )
+        layout.addWidget(self.generate_pdf)
         layout.addStretch()
 
     def _apply_tile_type_preset(self) -> None:
@@ -746,6 +754,7 @@ class Sidebar(QTabWidget):
         self.paint_process_factor = self.settings_panel.paint_process_factor
         self.paint_price = self.settings_panel.paint_price
         self.generate = self.settings_panel.generate
+        self.generate_pdf = self.settings_panel.generate_pdf
         self.paint_company.currentTextChanged.connect(self._change_catalog)
         self.settings_panel.import_catalog.clicked.connect(self._import_catalog)
         self._change_catalog(first_name)
@@ -787,6 +796,7 @@ class Sidebar(QTabWidget):
             index = self.indexOf(panel)
             if index >= 0:
                 self.setTabEnabled(index, enabled)
+        self.generate_pdf.setEnabled(enabled)
 
     def _import_catalog(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
