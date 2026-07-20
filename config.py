@@ -6,7 +6,7 @@ Global configuration for Blueprint Mosaic Studio.
 
 from pathlib import Path
 
-PROJECT_NAME = "White Dove"
+PROJECT_NAME = "Blueprint Mosaic Studio"
 
 IMAGE_FILE = Path("images/dove.png")
 

@@ -260,7 +260,11 @@ def draw_title(
 
     center = BORDER + image_width // 2
 
-    title = PROJECT_NAME
+    title = (
+        project.source_path.name
+        if project.source_path is not None
+        else PROJECT_NAME
+    )
     if title_suffix:
         title = f"{title} — {title_suffix}"
     draw.text(
@@ -504,7 +508,11 @@ def render_master(
         if palette_color_count is not None
         else len(set(project.palette.values()))
     )
-    footer_name = PROJECT_NAME
+    footer_name = (
+        project.source_path.name
+        if project.source_path is not None
+        else PROJECT_NAME
+    )
     if title_suffix:
         footer_name = f"{footer_name} — {title_suffix}"
     footer = (
