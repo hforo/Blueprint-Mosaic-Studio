@@ -1,7 +1,7 @@
 """
 image.py
 
-Image processing for the Cartridge Mosaic Generator.
+Image processing for Blueprint Mosaic Studio.
 """
 
 from collections import Counter

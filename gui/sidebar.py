@@ -160,8 +160,7 @@ class PalettePanel(QWidget):
             estimate_item = QTableWidgetItem(paint_estimate.display_text())
             estimate_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
             estimate_item.setToolTip(
-                "Estimated coating consumed; excludes paint needed to fill "
-                "the dipping container"
+                "Estimated coating consumed from the configured coated area per tile"
             )
             paint_item = QTableWidgetItem(
                 f"{paint.display_code} · {paint.name}\n"
@@ -195,9 +194,9 @@ class PalettePanel(QWidget):
         self.summary.setText(
             f"{len(palette)} colors · {total_tiles:,} numbered squares\n"
             f"Estimated coating: {total_estimate_text}\n"
-            f"Assumptions: 4 cartridges/square · "
+            f"Assumptions: {paint_estimator.tile_surface_area_sq_in:.3f} in² coated/tile · "
             f"{paint_estimator.coverage_sq_ft_per_gallon:.0f} ft²/gal · "
-            f"{paint_estimator.process_factor:.2f}× dip/waste"
+            f"{paint_estimator.process_factor:.2f}× application/waste"
         )
         self.table.setUpdatesEnabled(True)
 
@@ -266,7 +265,7 @@ class SummaryPanel(QWidget):
         note = QLabel(
             "Cost is proportional paint consumed at the configured gallon price. "
             "It excludes minimum container sizes, tint/base differences, tax, and "
-            "paint retained in the dipping vessel."
+            "paint retained in application tools or containers."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color: palette(mid); font-size: 11px;")
@@ -556,6 +555,17 @@ class SettingsPanel(QWidget):
             "Physical width and height of one finished mosaic tile"
         )
         form.addRow("Tile size", self.tile_size)
+        self.tile_surface_area = QDoubleSpinBox()
+        self.tile_surface_area.setRange(0.001, 100000.0)
+        self.tile_surface_area.setDecimals(3)
+        self.tile_surface_area.setSingleStep(0.05)
+        self.tile_surface_area.setValue(0.5625)
+        self.tile_surface_area.setSuffix(" in²")
+        self.tile_surface_area.setToolTip(
+            "Total area painted on one tile. Use width × height for one face, "
+            "or include edges and other exposed faces when applicable."
+        )
+        form.addRow("Coated area / tile", self.tile_surface_area)
         self.image_colors = QSpinBox()
         self.image_colors.setRange(2, 256)
         self.image_colors.setValue(256)
@@ -601,9 +611,9 @@ class SettingsPanel(QWidget):
         self.paint_process_factor.setValue(2.0)
         self.paint_process_factor.setSuffix("×")
         self.paint_process_factor.setToolTip(
-            "Multiplier for dipping, drainage, transfer loss, and waste"
+            "Multiplier for application loss, transfer loss, retained paint, and waste"
         )
-        form.addRow("Dip/waste factor", self.paint_process_factor)
+        form.addRow("Application/waste factor", self.paint_process_factor)
         self.paint_price = QDoubleSpinBox()
         self.paint_price.setRange(0.0, 1000.0)
         self.paint_price.setDecimals(2)
@@ -682,6 +692,7 @@ class Sidebar(QTabWidget):
         self.finished_width = self.settings_panel.finished_width
         self.live_preview = self.settings_panel.live_preview
         self.tile_size = self.settings_panel.tile_size
+        self.tile_surface_area = self.settings_panel.tile_surface_area
         self.image_colors = self.settings_panel.image_colors
         self.sw_colors = self.settings_panel.sw_colors
         self.colors = self.image_colors
@@ -779,6 +790,7 @@ class Sidebar(QTabWidget):
         return PaintUsageEstimator(
             coverage_sq_ft_per_gallon=self.paint_coverage.value(),
             process_factor=self.paint_process_factor.value(),
+            tile_surface_area_sq_in=self.tile_surface_area.value(),
         )
 
     def create_paint_plan(

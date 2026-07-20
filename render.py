@@ -1,7 +1,7 @@
 """
 render.py
 
-Rendering functions for the Cartridge Mosaic Generator.
+Rendering functions for Blueprint Mosaic Studio.
 """
 
 from pathlib import Path
@@ -20,7 +20,6 @@ from config import (
     TITLE_FONT_SIZE,
     HEADER_FONT_SIZE,
     CELL_FONT_SIZE,
-    CARTRIDGES_PER_MODULE,
 )
 
 
@@ -239,13 +238,11 @@ def draw_title(
         fill="black",
     )
 
-    total_modules = project.width * project.height
-    total_cartridges = total_modules * CARTRIDGES_PER_MODULE
+    total_tiles = project.width * project.height
     finished_width = project.finished_width_inches
     finished_height = project.finished_height_inches
     stats = (
-        f"{total_modules:,} Modules   |   "
-        f"{total_cartridges:,} Cartridges   |   "
+        f"{total_tiles:,} Tiles   |   "
         f"{finished_width:.1f}\" × {finished_height:.1f}\""
     )
 

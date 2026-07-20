@@ -1,10 +1,9 @@
-"""Paint-consumption estimates for cartridge mosaic production."""
+"""Paint-consumption estimates for square-tile mosaic production."""
 
 from dataclasses import dataclass
 from math import ceil
 
 
-SQ_FT_PER_556_CARTRIDGE = 0.018
 MILLILITERS_PER_GALLON = 3785.411784
 FLUID_OUNCES_PER_GALLON = 128.0
 STANDARD_CONTAINER_OUNCES = (("gallon", 128.0), ("quart", 32.0), ("sample", 8.0))
@@ -52,34 +51,24 @@ class PaintEstimate:
 
 @dataclass(frozen=True, slots=True)
 class PaintUsageEstimator:
-    """Estimate paint film consumed from surface area and spread rate.
-
-    The cartridge area is an engineering approximation for the exterior of a
-    complete 5.56×45 mm cartridge. ``process_factor`` accounts for dipping,
-    drainage, transfer losses, and practical waste.
-    """
+    """Estimate paint consumed from coated tile area and spread rate."""
 
     coverage_sq_ft_per_gallon: float = 350.0
     process_factor: float = 2.0
-    cartridges_per_tile: int = 4
-    cartridge_area_sq_ft: float = SQ_FT_PER_556_CARTRIDGE
+    tile_surface_area_sq_in: float = 0.5625
 
     def __post_init__(self) -> None:
         if self.coverage_sq_ft_per_gallon <= 0:
             raise ValueError("Paint coverage must be greater than zero.")
         if self.process_factor <= 0:
             raise ValueError("Paint process factor must be greater than zero.")
-        if self.cartridges_per_tile <= 0 or self.cartridge_area_sq_ft <= 0:
-            raise ValueError("Cartridge quantity and surface area must be positive.")
+        if self.tile_surface_area_sq_in <= 0:
+            raise ValueError("Coated surface area per tile must be positive.")
 
     def estimate(self, tile_count: int) -> PaintEstimate:
         if tile_count < 0:
             raise ValueError("Tile count cannot be negative.")
-        surface_area = (
-            tile_count
-            * self.cartridges_per_tile
-            * self.cartridge_area_sq_ft
-        )
+        surface_area = tile_count * self.tile_surface_area_sq_in / 144.0
         gallons = (
             surface_area
             / self.coverage_sq_ft_per_gallon

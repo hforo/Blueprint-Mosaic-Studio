@@ -1,7 +1,7 @@
 """
 models.py
 
-Data models used by the Cartridge Mosaic Generator.
+Data models used by Blueprint Mosaic Studio.
 """
 
 from dataclasses import dataclass
