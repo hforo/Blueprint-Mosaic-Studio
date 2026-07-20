@@ -7,7 +7,8 @@ from pathlib import Path
 from PySide6.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import (
     QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent,
-    QBrush, QImage, QImageReader, QPainter, QPainterPath, QPen, QPixmap,
+    QBrush, QImage, QImageIOHandler, QImageReader, QPainter, QPainterPath,
+    QPen, QPixmap,
     QTransform, QWheelEvent,
 )
 from PySide6.QtWidgets import (
@@ -111,19 +112,22 @@ class CanvasView(QGraphicsView):
         QImageReader.setAllocationLimit(self.IMAGE_DECODE_LIMIT_MB)
         reader = QImageReader(str(path))
         reader.setAutoTransform(True)
-        source_size = reader.size()
-        if not source_size.isValid():
+        raw_source_size = reader.size()
+        if not raw_source_size.isValid():
             self.image_load_failed.emit(f"Unable to load image: {path}")
             return False
 
-        preview_size = self._preview_size(source_size)
-        if preview_size != source_size:
+        preview_size = self._preview_size(raw_source_size)
+        if preview_size != raw_source_size:
             reader.setScaledSize(preview_size)
         preview_image = reader.read()
         if preview_image.isNull():
             detail = reader.errorString() or "unsupported or corrupt image"
             self.image_load_failed.emit(f"Unable to load image: {path}\n{detail}")
             return False
+        source_size = QSize(raw_source_size)
+        if reader.transformation() & QImageIOHandler.Transformation.TransformationRotate90:
+            source_size.transpose()
         pixmap = QPixmap.fromImage(preview_image)
 
         self.canvas_scene.clear()

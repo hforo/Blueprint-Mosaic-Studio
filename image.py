@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TypeAlias
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 CropBox: TypeAlias = tuple[int, int, int, int]
@@ -52,7 +52,10 @@ def load_image(filename: Path) -> Image.Image:
     if not filename.exists():
         raise FileNotFoundError(filename)
 
-    return Image.open(filename).convert("RGB")
+    with Image.open(filename) as source:
+        # Match QImageReader's auto-transform behavior so live previews,
+        # generated blueprints, and the displayed source share orientation.
+        return ImageOps.exif_transpose(source).convert("RGB")
 
 
 # ---------------------------------------------------------
