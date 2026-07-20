@@ -37,6 +37,7 @@ class MosaicProject:
     source_path: Path | None = None
     tile_size_inches: float = 0.75
     tile_type: str = "Flat square — one face"
+    background_name: str = "White"
 
     @property
     def finished_width_inches(self) -> float:

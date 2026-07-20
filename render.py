@@ -23,6 +23,18 @@ from config import (
 )
 
 
+MOSAIC_BACKGROUNDS = {
+    "White": (255, 255, 255),
+    "Black": (24, 24, 24),
+    "Neutral gray": (150, 150, 150),
+    "Maple plywood": (214, 181, 126),
+}
+
+
+def mosaic_background_rgb(name):
+    return MOSAIC_BACKGROUNDS.get(name, MOSAIC_BACKGROUNDS["White"])
+
+
 # ----------------------------------------------------------
 # Fonts
 # ----------------------------------------------------------
@@ -420,6 +432,11 @@ def render_master(
     # ------------------------------------------------------
     # Cells
     # ------------------------------------------------------
+
+    draw.rectangle(
+        (BORDER, BORDER, BORDER + image_width, BORDER + image_height),
+        fill=mosaic_background_rgb(project.background_name),
+    )
 
     for row in grid:
         for cell in row:

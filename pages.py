@@ -25,6 +25,7 @@ from render import (
     load_coordinate_font,
     load_fonts,
     load_sized_font,
+    mosaic_background_rgb,
 )
 
 
@@ -94,6 +95,15 @@ def render_pages(
                 "white",
             )
             draw = ImageDraw.Draw(canvas)
+            draw.rectangle(
+                (
+                    page_border,
+                    page_border,
+                    page_border + width * PAGE_CELL_SIZE,
+                    page_border + height * PAGE_CELL_SIZE,
+                ),
+                fill=mosaic_background_rgb(project.background_name),
+            )
             page_title = (
                 project.source_path.name
                 if project.source_path is not None
@@ -244,7 +254,7 @@ def render_location_thumbnail(
         shaped_source = Image.new(
             "RGB",
             (project.width * shape_scale, project.height * shape_scale),
-            "white",
+            mosaic_background_rgb(project.background_name),
         )
         shaped_draw = ImageDraw.Draw(shaped_source)
         for row in project.grid:

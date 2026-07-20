@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 
 from PySide6.QtCore import QEvent, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtGui import QColor, QIcon, QPixmap
 
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
@@ -450,8 +450,13 @@ class PagesPanel(QWidget):
         self.page_list.clear()
         restored_item = None
         for section in sections:
+            thumbnail = QPixmap()
+            try:
+                thumbnail.loadFromData(section.thumbnail_path.read_bytes())
+            except OSError:
+                pass
             item = QListWidgetItem(
-                QIcon(str(section.thumbnail_path)),
+                QIcon(thumbnail),
                 f"{section.title}\n{section.location_text}",
             )
             item.setData(Qt.ItemDataRole.UserRole, str(section.image_path))
@@ -582,6 +587,18 @@ class SettingsPanel(QWidget):
             "Custom coated area to enter it manually."
         )
         form.addRow("Tile type", self.tile_type)
+        self.background_color = QComboBox()
+        self.background_color.addItems([
+            "White",
+            "Black",
+            "Neutral gray",
+            "Maple plywood",
+        ])
+        self.background_color.setToolTip(
+            "Color of the backing visible between round or grouped pieces. "
+            "Maple plywood is an on-screen approximation."
+        )
+        form.addRow("Backing / background", self.background_color)
         self.tile_surface_area = QDoubleSpinBox()
         self.tile_surface_area.setRange(0.001, 100000.0)
         self.tile_surface_area.setDecimals(3)
@@ -750,6 +767,7 @@ class Sidebar(QTabWidget):
         self.live_preview = self.settings_panel.live_preview
         self.tile_size = self.settings_panel.tile_size
         self.tile_type = self.settings_panel.tile_type
+        self.background_color = self.settings_panel.background_color
         self.tile_surface_area = self.settings_panel.tile_surface_area
         self.image_colors = self.settings_panel.image_colors
         self.sw_colors = self.settings_panel.sw_colors

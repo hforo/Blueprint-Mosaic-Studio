@@ -101,6 +101,7 @@ class CanvasView(QGraphicsView):
         self.setFrameShape(QGraphicsView.Shape.NoFrame)
 
     def load_image(self, filename: str | Path) -> bool:
+        self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
         self._preview_source_state = None
         self.highlight_item = None
         self.grid_items = []
@@ -252,6 +253,9 @@ class CanvasView(QGraphicsView):
         """Display an in-memory preview while retaining source and crop state."""
         if image.isNull():
             return False
+        # Pixel-art previews must not be interpolated: fractional scaling can
+        # otherwise create false seams that look like a disappearing grid.
+        self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
         source_state = self._preview_source_state
         if source_state is None:
             if not self.model.has_image or self.model.image_path is None:
@@ -277,6 +281,8 @@ class CanvasView(QGraphicsView):
 
     def restore_source_image(self) -> bool:
         """Return from artifact preview to the original image and crop."""
+        self.clear_mosaic_grid()
+        self.clear_highlights()
         if self._preview_source_state is None:
             return False
         source_path, crop_rect = self._preview_source_state

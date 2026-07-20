@@ -218,6 +218,7 @@ def process_image(
     crop_box: CropBox | None = None,
     tile_size_inches: float = 0.75,
     tile_type: str = "Flat square — one face",
+    background_name: str = "White",
 ) -> MosaicProject:
     """Load and process an image while preserving the established pipeline.
 
@@ -266,4 +267,5 @@ def process_image(
         source_path=Path(filename).resolve(),
         tile_size_inches=tile_size_inches,
         tile_type=tile_type,
+        background_name=background_name,
     )
