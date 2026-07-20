@@ -23,10 +23,10 @@ from config import (
     BORDER, CELL_SIZE, PAGE_CELL_SIZE, PAGE_COLUMNS, PAGE_ROWS,
     PAGE_TITLE_HEIGHT,
 )
-from PIL import Image as PILImage
+from PIL import Image as PILImage, ImageDraw as PILImageDraw
 from image import prepare_mosaic_image, process_image
 from pages import OVERVIEW_SIZE, render_pages
-from render import blueprint_output_path, render_master
+from render import blueprint_output_path, draw_tile_fill, render_master
 from project_io import load_project, save_project
 from export import export_blueprint_pdf, export_shopping_csv
 
@@ -44,6 +44,7 @@ class PreviewWorker(QRunnable):
     def __init__(
         self, request_id: int, image_path: str, width: int, height: int,
         colors: int, dither: str, crop_box: tuple[int, int, int, int],
+        tile_type: str,
     ) -> None:
         super().__init__()
         self.request_id = request_id
@@ -53,6 +54,7 @@ class PreviewWorker(QRunnable):
         self.colors = colors
         self.dither = dither
         self.crop_box = crop_box
+        self.tile_type = tile_type
         self.signals = PreviewSignals()
 
     def run(self) -> None:
@@ -61,12 +63,31 @@ class PreviewWorker(QRunnable):
                 self.image_path, self.width, self.height, self.colors,
                 self.dither, self.crop_box,
             )
-            mosaic = palette_image.convert("RGB")
-            scale = max(1, min(24, 1200 // max(mosaic.size)))
-            mosaic = mosaic.resize(
-                (mosaic.width * scale, mosaic.height * scale),
-                PILImage.Resampling.NEAREST,
+            source = palette_image.convert("RGB")
+            scale = max(1, min(24, 1200 // max(source.size)))
+            shaped = self.tile_type in (
+                "Round disc — one face",
+                "Sphere — all surface",
+                "4-piece 5.56 cartridge tile",
             )
+            if shaped:
+                scale = max(4, scale)
+                mosaic = PILImage.new(
+                    "RGB", (source.width * scale, source.height * scale), "white"
+                )
+                draw = PILImageDraw.Draw(mosaic)
+                pixels = source.load()
+                for row in range(source.height):
+                    for column in range(source.width):
+                        draw_tile_fill(
+                            draw, column * scale, row * scale, scale,
+                            pixels[column, row], self.tile_type,
+                        )
+            else:
+                mosaic = source.resize(
+                    (source.width * scale, source.height * scale),
+                    PILImage.Resampling.NEAREST,
+                )
         except (OSError, ValueError):
             return
         self.signals.ready.emit(
@@ -254,6 +275,7 @@ class MainWindow(QMainWindow):
         self.sidebar.image_colors.valueChanged.connect(self._update_project_statistics)
         self.sidebar.sw_colors.valueChanged.connect(self._update_project_statistics)
         self.sidebar.dither.currentTextChanged.connect(self._schedule_live_preview)
+        self.sidebar.tile_type.currentTextChanged.connect(self._schedule_live_preview)
         self.sidebar.live_preview.toggled.connect(self._toggle_live_preview)
         self.sidebar.grid.valueChanged.connect(self._sync_finished_width)
         self.sidebar.tile_size.valueChanged.connect(self._sync_finished_width)
@@ -613,6 +635,7 @@ class MainWindow(QMainWindow):
             self._preview_request_id, image_path, grid_width, grid_height,
             self.sidebar.image_colors.value(),
             self.sidebar.dither.currentText().lower(), crop_box,
+            self.sidebar.tile_type.currentText(),
         )
         worker.signals.ready.connect(self._apply_live_preview)
         self._preview_worker = worker
@@ -687,12 +710,13 @@ class MainWindow(QMainWindow):
         self.message_label.setText("Generating blueprint…")
         QApplication.processEvents()
         try:
-            advance(0, "Averaging source image into mosaic squares...")
+            advance(0, "Averaging source image into mosaic grid cells...")
             project = process_image(
                 Path(image_path), grid_width, grid_height,
                 self.sidebar.colors.value(),
                 dither=self.sidebar.dither.currentText().lower(), crop_box=crop_box,
                 tile_size_inches=self.sidebar.tile_size.value(),
+                tile_type=self.sidebar.tile_type.currentText(),
             )
             advance(1, "Matching the mosaic palette to paint colors...")
             positions_by_palette: dict[int, list[tuple[int, int]]] = {}

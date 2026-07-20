@@ -36,6 +36,7 @@ class MosaicProject:
     grid: List[List[Cell]]
     source_path: Path | None = None
     tile_size_inches: float = 0.75
+    tile_type: str = "Flat square — one face"
 
     @property
     def finished_width_inches(self) -> float:

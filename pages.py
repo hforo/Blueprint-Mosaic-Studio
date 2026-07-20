@@ -21,6 +21,7 @@ from render import (
     draw_column_labels,
     draw_grid,
     draw_row_labels,
+    draw_tile_fill,
     load_coordinate_font,
     load_fonts,
     load_sized_font,
@@ -131,6 +132,7 @@ def render_pages(
                         ),
                         cell_size=PAGE_CELL_SIZE,
                         border=page_border,
+                        tile_type=project.tile_type,
                     )
             draw_grid(
                 draw, width, height,
@@ -230,6 +232,33 @@ def render_location_thumbnail(
                 for cell in row
             ]
         )
+    if project.tile_type in (
+        "Round disc — one face",
+        "Sphere — all surface",
+        "4-piece 5.56 cartridge tile",
+    ):
+        shape_scale = 4
+        shaped_source = Image.new(
+            "RGB",
+            (project.width * shape_scale, project.height * shape_scale),
+            "white",
+        )
+        shaped_draw = ImageDraw.Draw(shaped_source)
+        for row in project.grid:
+            for cell in row:
+                fill_rgb = (
+                    color_overrides.get(cell.color, cell.rgb)
+                    if color_overrides is not None else cell.rgb
+                )
+                draw_tile_fill(
+                    shaped_draw,
+                    cell.column * shape_scale,
+                    cell.row * shape_scale,
+                    shape_scale,
+                    fill_rgb,
+                    project.tile_type,
+                )
+        source = shaped_source
     contained = ImageOps.contain(source, OVERVIEW_SIZE, Image.Resampling.NEAREST)
     overview = Image.new("RGB", OVERVIEW_SIZE, (235, 235, 235))
     offset_x = (OVERVIEW_SIZE[0] - contained.width) // 2

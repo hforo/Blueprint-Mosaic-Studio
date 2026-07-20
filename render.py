@@ -100,6 +100,31 @@ def cell_position(row, column, cell_size=CELL_SIZE, border=BORDER):
 # Drawing
 # ----------------------------------------------------------
 
+def draw_tile_fill(draw, x, y, size, fill_rgb, tile_type):
+    """Draw the physical-piece silhouette within one logical grid cell."""
+    if tile_type in ("Round disc — one face", "Sphere — all surface"):
+        inset = max(1, round(size * 0.06))
+        draw.ellipse(
+            (x + inset, y + inset, x + size - inset, y + size - inset),
+            fill=fill_rgb,
+        )
+    elif tile_type == "4-piece 5.56 cartridge tile" and size >= 4:
+        half = size / 2
+        inset = max(1, round(size * 0.04))
+        for tile_row in range(2):
+            for tile_column in range(2):
+                draw.ellipse(
+                    (
+                        x + tile_column * half + inset,
+                        y + tile_row * half + inset,
+                        x + (tile_column + 1) * half - inset,
+                        y + (tile_row + 1) * half - inset,
+                    ),
+                    fill=fill_rgb,
+                )
+    else:
+        draw.rectangle((x, y, x + size, y + size), fill=fill_rgb)
+
 def draw_cell(
     draw,
     cell,
@@ -110,9 +135,10 @@ def draw_cell(
     show_label=True,
     cell_size=CELL_SIZE,
     border=BORDER,
+    tile_type="Flat square — one face",
 ):
     """
-    Draw one colored module.
+    Draw one colored mosaic tile.
     """
 
     x, y = cell_position(
@@ -123,15 +149,7 @@ def draw_cell(
     )
 
     display_rgb = fill_rgb if fill_rgb is not None else cell.rgb
-    draw.rectangle(
-        (
-            x,
-            y,
-            x + cell_size,
-            y + cell_size,
-        ),
-        fill=display_rgb,
-    )
+    draw_tile_fill(draw, x, y, cell_size, display_rgb, tile_type)
 
     if not show_label:
         return
@@ -415,6 +433,7 @@ def render_master(
                     else None
                 ),
                 show_label=show_labels,
+                tile_type=project.tile_type,
             )
 
     # ------------------------------------------------------
