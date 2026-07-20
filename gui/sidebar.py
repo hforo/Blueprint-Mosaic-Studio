@@ -260,7 +260,7 @@ class SummaryPanel(QWidget):
         self.table = QTableWidget(0, 8, self)
         self.table.setHorizontalHeaderLabels(
             [
-                "Color", "Paint color", "Catalog", "Coordinates", "Tiles",
+                "Blueprint #", "Paint color", "Catalog", "Coordinates", "Tiles",
                 "Paint", "Buy", "Cost",
             ]
         )
@@ -321,8 +321,17 @@ class SummaryPanel(QWidget):
         total_tiles = 0
         poor_matches = 0
         for row_index, row in enumerate(plan.rows):
-            swatch = QTableWidgetItem()
+            swatch = QTableWidgetItem(str(row_index + 1))
             swatch.setBackground(QColor(*row.paint.rgb))
+            swatch.setForeground(
+                QColor("white")
+                if QColor(*row.paint.rgb).lightness() < 130 else QColor("black")
+            )
+            swatch.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            swatch.setToolTip(
+                f"Blueprint tile number {row_index + 1}: "
+                f"{row.paint.display_code} {row.paint.name}"
+            )
             paint_name = QTableWidgetItem(
                 f"{row.paint.display_code} · {row.paint.name}\n"
                 f"{row.paint.hex_value}"

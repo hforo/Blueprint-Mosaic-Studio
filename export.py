@@ -19,13 +19,13 @@ def export_shopping_csv(path: str | Path, plan) -> None:
     with Path(path).open("w", newline="", encoding="utf-8-sig") as output:
         writer = csv.writer(output)
         writer.writerow([
-            "Catalog", "Color code", "Color name", "Hex", "Tiles",
+            "Blueprint #", "Catalog", "Color code", "Color name", "Hex", "Tiles",
             "Estimated mL", "Estimated fl oz", "Suggested containers",
             "Estimated proportional cost",
         ])
-        for row in plan.rows:
+        for blueprint_number, row in enumerate(plan.rows, start=1):
             writer.writerow([
-                plan.catalog_name, row.paint.display_code, row.paint.name,
+                blueprint_number, plan.catalog_name, row.paint.display_code, row.paint.name,
                 row.paint.hex_value, row.tile_count,
                 f"{row.estimate.milliliters:.1f}",
                 f"{row.estimate.fluid_ounces:.2f}",
@@ -36,7 +36,7 @@ def export_shopping_csv(path: str | Path, plan) -> None:
 
 def _summary_page(
     plan, source_name: str, rows, page_number: int, total_pages: int,
-    project=None,
+    project=None, start_blueprint_number: int = 1,
 ) -> Image.Image:
     width, height = LETTER_PORTRAIT
     image = Image.new("RGB", (width, height), "white")
@@ -64,16 +64,17 @@ def _summary_page(
     y = 165
     draw.rectangle((50, y, width - 50, y + 34), fill=(225, 225, 225))
     for x, label in (
-        (60, "COLOR / NAME"), (600, "TILES"), (690, "PAINT NEEDED"),
+        (60, "#"), (105, "COLOR / NAME"), (600, "TILES"), (690, "PAINT NEEDED"),
         (875, "BUY"), (1120, "COST"),
     ):
         draw.text((x, y + 7), label, fill="black", font=small)
     y += 42
 
-    for row in rows:
-        draw.rectangle((55, y, 87, y + 32), fill=row.paint.rgb, outline="black")
+    for blueprint_number, row in enumerate(rows, start=start_blueprint_number):
+        draw.text((60, y + 5), str(blueprint_number), fill="black", font=small)
+        draw.rectangle((100, y, 132, y + 32), fill=row.paint.rgb, outline="black")
         draw.text(
-            (98, y + 5), f"{row.paint.display_code}  {row.paint.name}",
+            (143, y + 5), f"{row.paint.display_code}  {row.paint.name}",
             fill="black", font=small,
         )
         draw.text((610, y + 5), f"{row.tile_count:,}", fill="black", font=small)
@@ -146,6 +147,7 @@ def export_blueprint_pdf(
     summary_pages = [
         _summary_page(
             plan, source_name, rows, index + 1, len(chunks), project,
+            index * rows_per_page + 1,
         )
         for index, rows in enumerate(chunks)
     ]
