@@ -292,6 +292,8 @@ class MainWindow(QMainWindow):
             )
             return
         self._blueprint_stale = True
+        self.sidebar.setCurrentWidget(self.sidebar.settings_panel)
+        self.sidebar.set_result_tabs_enabled(False)
         self.sidebar.settings_panel.generation_status.setText(
             "Blueprint out of date — generate again to apply changed settings"
         )
