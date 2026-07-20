@@ -773,6 +773,7 @@ class MainWindow(QMainWindow):
             render_master(
                 project,
                 color_overrides=paint_plan.color_overrides,
+                label_overrides=paint_plan.blueprint_labels,
                 filename_tag="SherwinWilliams_Numbered",
                 palette_color_count=len(paint_plan.rows),
                 title_suffix=f"{paint_company} — Numbered Blueprint",
@@ -801,6 +802,7 @@ class MainWindow(QMainWindow):
             page_sections = render_pages(
                 project,
                 color_overrides=paint_plan.color_overrides,
+                label_overrides=paint_plan.blueprint_labels,
                 color_label=f"{paint_company} Build Page",
             )
             advance(7, "Updating summaries and page navigation...")

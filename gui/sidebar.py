@@ -48,7 +48,7 @@ class PalettePanel(QWidget):
         self.table = QTableWidget(0, 7, self)
         self.table.setHorizontalHeaderLabels(
             [
-                "#", "Mosaic", "Value", "Closest paint color",
+                "Blueprint #", "Source shade", "Source values", "Matched paint color",
                 "Match", "Est. paint", "Tiles",
             ]
         )
@@ -137,23 +137,23 @@ class PalettePanel(QWidget):
         """Display one row for each matched manufacturer paint color."""
         self.table.setUpdatesEnabled(False)
         total_tiles = sum(color_counts.values())
-        groups = {}
-        for palette_number in sorted(palette):
-            matched_code = paint_plan.matches[palette_number].color.code
-            groups.setdefault(matched_code, []).append(palette_number)
+        groups = [row.palette_numbers for row in paint_plan.rows]
         self.table.setRowCount(len(groups))
 
-        for row, color_numbers in enumerate(groups.values()):
+        for row, color_numbers in enumerate(groups):
             color_number = color_numbers[0]
             red, green, blue = palette[color_number]
             color = QColor(red, green, blue)
             paint_match = paint_plan.matches[color_number]
             paint = paint_match.color
             match_color = QColor(*paint.rgb)
-            number_text = ", ".join(str(number) for number in color_numbers)
-            number_item = QTableWidgetItem(number_text)
+            blueprint_number = row + 1
+            number_item = QTableWidgetItem(str(blueprint_number))
             number_item.setData(Qt.ItemDataRole.UserRole, tuple(color_numbers))
-            number_item.setToolTip(f"Mosaic colors {number_text}")
+            number_item.setToolTip(
+                f"Number {blueprint_number} is printed in every blueprint cell "
+                "that uses this matched paint."
+            )
             number_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             swatch_item = QTableWidgetItem()

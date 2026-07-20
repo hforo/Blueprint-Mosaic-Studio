@@ -62,6 +62,7 @@ def render_pages(
     project,
     color_overrides=None,
     color_label: str | None = None,
+    label_overrides=None,
 ) -> list[PageSection]:
     """Render printable pages with a full-mosaic location overview."""
     PAGES_FOLDER.mkdir(exist_ok=True)
@@ -143,6 +144,10 @@ def render_pages(
                         cell_size=PAGE_CELL_SIZE,
                         border=page_border,
                         tile_type=project.tile_type,
+                        label_number=(
+                            label_overrides.get(project.grid[row][column].color)
+                            if label_overrides is not None else None
+                        ),
                     )
             draw_grid(
                 draw, width, height,

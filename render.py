@@ -150,6 +150,7 @@ def draw_cell(
     cell_size=CELL_SIZE,
     border=BORDER,
     tile_type="Flat square — one face",
+    label_number=None,
 ):
     """
     Draw one colored mosaic tile.
@@ -168,7 +169,7 @@ def draw_cell(
     if not show_label:
         return
 
-    label = str(cell.color)
+    label = str(cell.color if label_number is None else label_number)
 
     bbox = draw.textbbox(
         (0, 0),
@@ -386,6 +387,7 @@ def render_master(
     title_suffix=None,
     show_labels=True,
     show_annotations=True,
+    label_overrides=None,
 ):
     """
     Render the complete master blueprint.
@@ -453,6 +455,10 @@ def render_master(
                 ),
                 show_label=show_labels,
                 tile_type=project.tile_type,
+                label_number=(
+                    label_overrides.get(cell.color)
+                    if label_overrides is not None else None
+                ),
             )
 
     # ------------------------------------------------------

@@ -57,6 +57,15 @@ class SherwinWilliamsPaintPlan:
     total_estimated_cost: float
     price_per_gallon: float
 
+    @property
+    def blueprint_labels(self) -> dict[int, int]:
+        """Map every source palette index to its shared matched-paint number."""
+        return {
+            palette_number: blueprint_number
+            for blueprint_number, row in enumerate(self.rows, start=1)
+            for palette_number in row.palette_numbers
+        }
+
     @classmethod
     def build(
         cls,
