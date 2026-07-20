@@ -273,6 +273,7 @@ class MainWindow(QMainWindow):
         for signal in (
             self.sidebar.grid.valueChanged,
             self.sidebar.tile_size.valueChanged,
+            self.sidebar.tile_type.currentTextChanged,
             self.sidebar.tile_surface_area.valueChanged,
             self.sidebar.image_colors.valueChanged,
             self.sidebar.sw_colors.valueChanged,
@@ -363,6 +364,7 @@ class MainWindow(QMainWindow):
                 "size_mode": self.sidebar.size_mode.currentIndex(),
                 "finished_width": self.sidebar.finished_width.value(),
                 "tile_size": self.sidebar.tile_size.value(),
+                "tile_type": self.sidebar.tile_type.currentText(),
                 "tile_surface_area": self.sidebar.tile_surface_area.value(),
                 "image_colors": self.sidebar.image_colors.value(),
                 "sw_colors": self.sidebar.sw_colors.value(),
@@ -433,12 +435,18 @@ class MainWindow(QMainWindow):
                 self.sidebar.paint_company.setCurrentText(paint_company)
             self.sidebar.grid.setValue(int(settings.get("grid", 96)))
             self.sidebar.tile_size.setValue(float(settings.get("tile_size", 0.75)))
-            self.sidebar.tile_surface_area.setValue(float(
-                settings.get(
-                    "tile_surface_area",
-                    float(settings.get("tile_size", 0.75)) ** 2,
-                )
-            ))
+            saved_tile_type = str(settings.get("tile_type", "Custom coated area"))
+            if self.sidebar.tile_type.findText(saved_tile_type) >= 0:
+                self.sidebar.tile_type.setCurrentText(saved_tile_type)
+            if saved_tile_type == "Custom coated area":
+                self.sidebar.tile_surface_area.setValue(float(
+                    settings.get(
+                        "tile_surface_area",
+                        float(settings.get("tile_size", 0.75)) ** 2,
+                    )
+                ))
+            else:
+                self.sidebar.settings_panel._apply_tile_type_preset()
             self.sidebar.image_colors.setValue(int(settings.get("image_colors", 256)))
             self.sidebar.sw_colors.setValue(int(settings.get("sw_colors", 100)))
             self.sidebar.dither.setCurrentText(str(settings.get("dither", "None")))

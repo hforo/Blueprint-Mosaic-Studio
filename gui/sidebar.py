@@ -1,6 +1,7 @@
 """Tabbed editor controls displayed beside the graphics canvas."""
 
 from collections.abc import Mapping
+from math import pi
 from pathlib import Path
 import shutil
 
@@ -555,6 +556,21 @@ class SettingsPanel(QWidget):
             "Physical width and height of one finished mosaic tile"
         )
         form.addRow("Tile size", self.tile_size)
+        self.tile_type = QComboBox()
+        self.tile_type.addItems([
+            "Flat square — one face",
+            "Flat square — both faces",
+            "Cube / block — all faces",
+            "Round disc — one face",
+            "Sphere — all surface",
+            "4-piece 5.56 cartridge tile",
+            "Custom coated area",
+        ])
+        self.tile_type.setToolTip(
+            "Select a preset to calculate coated area per tile, or choose "
+            "Custom coated area to enter it manually."
+        )
+        form.addRow("Tile type", self.tile_type)
         self.tile_surface_area = QDoubleSpinBox()
         self.tile_surface_area.setRange(0.001, 100000.0)
         self.tile_surface_area.setDecimals(3)
@@ -566,6 +582,9 @@ class SettingsPanel(QWidget):
             "or include edges and other exposed faces when applicable."
         )
         form.addRow("Coated area / tile", self.tile_surface_area)
+        self.tile_type.currentTextChanged.connect(self._apply_tile_type_preset)
+        self.tile_size.valueChanged.connect(self._apply_tile_type_preset)
+        self._apply_tile_type_preset()
         self.image_colors = QSpinBox()
         self.image_colors.setRange(2, 256)
         self.image_colors.setValue(256)
@@ -648,6 +667,24 @@ class SettingsPanel(QWidget):
         layout.addWidget(self.generate)
         layout.addStretch()
 
+    def _apply_tile_type_preset(self) -> None:
+        tile_width = self.tile_size.value()
+        tile_type = self.tile_type.currentText()
+        areas = {
+            "Flat square — one face": tile_width ** 2,
+            "Flat square — both faces": 2 * tile_width ** 2,
+            "Cube / block — all faces": 6 * tile_width ** 2,
+            "Round disc — one face": pi * (tile_width / 2) ** 2,
+            "Sphere — all surface": pi * tile_width ** 2,
+            # Four complete cartridges at 0.018 square feet each.
+            "4-piece 5.56 cartridge tile": 4 * 0.018 * 144,
+        }
+        if tile_type in areas:
+            self.tile_surface_area.setValue(areas[tile_type])
+            self.tile_surface_area.setEnabled(False)
+        else:
+            self.tile_surface_area.setEnabled(True)
+
 class Sidebar(QTabWidget):
     """Tabbed sidebar containing settings and the generated color legend."""
 
@@ -692,6 +729,7 @@ class Sidebar(QTabWidget):
         self.finished_width = self.settings_panel.finished_width
         self.live_preview = self.settings_panel.live_preview
         self.tile_size = self.settings_panel.tile_size
+        self.tile_type = self.settings_panel.tile_type
         self.tile_surface_area = self.settings_panel.tile_surface_area
         self.image_colors = self.settings_panel.image_colors
         self.sw_colors = self.settings_panel.sw_colors
