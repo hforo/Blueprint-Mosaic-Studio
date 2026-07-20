@@ -67,8 +67,33 @@ def resize_image(
 
     return image.resize(
         (width, height),
-        Image.Resampling.LANCZOS,
+        # BOX averages all source pixels covered by a mosaic cell.  This gives
+        # photographs a faithful one-color-per-tile starting point instead of
+        # blending detail across neighboring cells like LANCZOS does.
+        Image.Resampling.BOX,
     )
+
+
+def prepare_mosaic_image(
+    filename: str | Path,
+    width: int,
+    height: int,
+    colors: int,
+    dither: bool = False,
+    crop_box: CropBox | None = None,
+) -> tuple[Image.Image, Image.Image, Image.Image]:
+    """Crop, average into square cells, and quantize a source image."""
+    original = load_image(Path(filename))
+    if crop_box is not None:
+        left, top, right, bottom = crop_box
+        if left < 0 or top < 0 or right > original.width or bottom > original.height:
+            raise ValueError("Crop rectangle lies outside the source image.")
+        if right <= left or bottom <= top:
+            raise ValueError("Crop rectangle must have a positive size.")
+        original = original.crop(crop_box)
+    resized = resize_image(original, width, height)
+    palette_image = quantize_image(resized, colors, dither)
+    return original, resized, palette_image
 
 
 # ---------------------------------------------------------
@@ -78,14 +103,27 @@ def resize_image(
 def quantize_image(
     image: Image.Image,
     colors: int,
-    dither: bool = False,
+    dither: bool | str = False,
 ) -> Image.Image:
-
-    return image.quantize(
+    mode = dither.lower() if isinstance(dither, str) else ("full" if dither else "none")
+    working = image
+    if mode == "light":
+        # A small ordered perturbation preserves gentle gradients without the
+        # dense salt-and-pepper texture of full error diffusion.
+        pixels = np.asarray(image, dtype=np.int16)
+        bayer = np.array([[0, 2], [3, 1]], dtype=np.int16)
+        offsets = (np.tile(bayer, (
+            (image.height + 1) // 2, (image.width + 1) // 2,
+        ))[:image.height, :image.width] - 1.5) * 6
+        working = Image.fromarray(
+            np.clip(pixels + offsets[:, :, None], 0, 255).astype(np.uint8),
+            "RGB",
+        )
+    return working.quantize(
         colors=colors,
         method=Image.Quantize.MEDIANCUT,
         dither=Image.Dither.FLOYDSTEINBERG
-        if dither
+        if mode == "full"
         else Image.Dither.NONE,
     )
 
@@ -190,25 +228,8 @@ def process_image(
     if tile_size_inches <= 0:
         raise ValueError("Tile size must be greater than zero.")
 
-    original = load_image(Path(filename))
-    if crop_box is not None:
-        left, top, right, bottom = crop_box
-        if left < 0 or top < 0 or right > original.width or bottom > original.height:
-            raise ValueError("Crop rectangle lies outside the source image.")
-        if right <= left or bottom <= top:
-            raise ValueError("Crop rectangle must have a positive size.")
-        original = original.crop(crop_box)
-
-    resized = resize_image(
-        original,
-        width,
-        height,
-    )
-
-    palette_image = quantize_image(
-        resized,
-        colors,
-        dither,
+    original, resized, palette_image = prepare_mosaic_image(
+        filename, width, height, colors, dither, crop_box,
     )
 
     rgb_image = palette_image.convert("RGB")
@@ -224,6 +245,11 @@ def process_image(
         index_map,
         palette,
     )
+    palette = {
+        color_number: rgb
+        for color_number, rgb in palette.items()
+        if color_number in counts
+    }
 
     return MosaicProject(
         original=original,

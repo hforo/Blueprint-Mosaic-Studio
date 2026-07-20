@@ -47,12 +47,37 @@ class SherwinWilliamsMatcher:
             )
         self.catalog_path = catalog_path
         self.source = ""
+        self.catalog_name = catalog_path.stem.replace("_", " ").title()
         self._colors = self._load_catalog(catalog_path)
         self._cache: dict[RGB, PaintMatch] = {}
 
     @property
     def color_count(self) -> int:
         return len(self._colors)
+
+    def find(self, query: str) -> tuple[PaintColor, ...]:
+        """Return catalog colors matching a code, name, or hex fragment."""
+        needle = query.strip().lower().removeprefix("sw ").removeprefix("sw")
+        if not needle:
+            return ()
+        matches = [
+            color for color in self._colors
+            if needle in color.code.lower().removeprefix("sw")
+            or needle in color.name.lower()
+            or needle in color.hex_value.lower()
+        ]
+        return tuple(matches[:50])
+
+    def by_code(self, code: str) -> PaintColor | None:
+        normalized = code.lower().replace(" ", "").removeprefix("sw")
+        return next(
+            (
+                color for color in self._colors
+                if color.code.lower().replace(" ", "").removeprefix("sw")
+                == normalized
+            ),
+            None,
+        )
 
     def nearest(self, rgb: RGB) -> PaintMatch:
         """Return the catalog entry with the smallest CIE76 distance."""
@@ -70,12 +95,37 @@ class SherwinWilliamsMatcher:
         self._cache[rgb] = match
         return match
 
+    def nearest_available(
+        self,
+        rgb: RGB,
+        excluded_codes: set[str],
+    ) -> PaintMatch:
+        """Return the nearest color not already reserved by the project."""
+        if not excluded_codes:
+            return self.nearest(rgb)
+        target = rgb_to_lab(rgb)
+        available = (
+            color for color in self._colors if color.code not in excluded_codes
+        )
+        try:
+            color, distance = min(
+                (
+                    (color, delta_e_cie76(target, color.lab))
+                    for color in available
+                ),
+                key=lambda result: result[1],
+            )
+        except ValueError as error:
+            raise ValueError("No unused Sherwin-Williams colors remain.") from error
+        return PaintMatch(color, distance)
+
     def _load_catalog(self, path: Path) -> tuple[PaintColor, ...]:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise ValueError(f"Unable to load paint catalog: {path}") from error
         self.source = str(payload.get("source", ""))
+        self.catalog_name = str(payload.get("catalog", self.catalog_name))
         colors = []
         for record in payload.get("colors", []):
             rgb = tuple(int(channel) for channel in record["rgb"])

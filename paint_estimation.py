@@ -1,11 +1,32 @@
 """Paint-consumption estimates for cartridge mosaic production."""
 
 from dataclasses import dataclass
+from math import ceil
 
 
 SQ_FT_PER_556_CARTRIDGE = 0.018
 MILLILITERS_PER_GALLON = 3785.411784
 FLUID_OUNCES_PER_GALLON = 128.0
+STANDARD_CONTAINER_OUNCES = (("gallon", 128.0), ("quart", 32.0), ("sample", 8.0))
+
+
+def container_plan(fluid_ounces: float) -> tuple[tuple[str, int], ...]:
+    """Round an estimate up into common retail paint-container sizes."""
+    remaining = max(0.0, fluid_ounces)
+    result = []
+    for name, size in STANDARD_CONTAINER_OUNCES[:-1]:
+        count = int(remaining // size)
+        if count:
+            result.append((name, count))
+            remaining -= count * size
+    if remaining > 0:
+        result.append((STANDARD_CONTAINER_OUNCES[-1][0], ceil(remaining / 8.0)))
+    return tuple(result)
+
+
+def container_plan_text(fluid_ounces: float) -> str:
+    plan = container_plan(fluid_ounces)
+    return ", ".join(f"{count} {name}{'' if count == 1 else 's'}" for name, count in plan) or "None"
 
 
 @dataclass(frozen=True, slots=True)

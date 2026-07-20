@@ -54,15 +54,19 @@ def load_fonts():
     return default, default, default
 
 
-def load_coordinate_font():
-    """Load a compact font whose two-letter labels fit inside one grid cell."""
-    font_size = max(8, CELL_SIZE // 2)
+def load_sized_font(font_size):
+    """Load a readable sans-serif font at an explicit pixel size."""
     for font_name in ("arial.ttf", "Arial.ttf", "DejaVuSans.ttf"):
         try:
             return ImageFont.truetype(font_name, font_size)
         except OSError:
             pass
     return ImageFont.load_default()
+
+
+def load_coordinate_font(cell_size=CELL_SIZE):
+    """Load a compact font whose two-letter labels fit inside one grid cell."""
+    return load_sized_font(max(8, cell_size // 2))
 
 
 # ----------------------------------------------------------
@@ -81,14 +85,14 @@ def text_color(rgb):
     return (0, 0, 0)
 
 
-def cell_position(row, column):
+def cell_position(row, column, cell_size=CELL_SIZE, border=BORDER):
     """
     Returns the pixel coordinates for the upper-left corner
     of a grid cell.
     """
 
-    x = BORDER + column * CELL_SIZE
-    y = BORDER + row * CELL_SIZE
+    x = border + column * cell_size
+    y = border + row * cell_size
 
     return x, y
 
@@ -105,6 +109,8 @@ def draw_cell(
     col_offset=0,
     fill_rgb=None,
     show_label=True,
+    cell_size=CELL_SIZE,
+    border=BORDER,
 ):
     """
     Draw one colored module.
@@ -113,6 +119,8 @@ def draw_cell(
     x, y = cell_position(
         cell.row - row_offset,
         cell.column - col_offset,
+        cell_size,
+        border,
     )
 
     display_rgb = fill_rgb if fill_rgb is not None else cell.rgb
@@ -120,8 +128,8 @@ def draw_cell(
         (
             x,
             y,
-            x + CELL_SIZE,
-            y + CELL_SIZE,
+            x + cell_size,
+            y + cell_size,
         ),
         fill=display_rgb,
     )
@@ -140,8 +148,8 @@ def draw_cell(
     w = bbox[2] - bbox[0]
     h = bbox[3] - bbox[1]
 
-    tx = x + (CELL_SIZE - w) / 2
-    ty = y + (CELL_SIZE - h) / 2
+    tx = x + (cell_size - w) / 2
+    ty = y + (cell_size - h) / 2
 
     draw.text(
         (tx, ty),
@@ -151,18 +159,18 @@ def draw_cell(
     )
 
 
-def draw_grid(draw, width, height):
+def draw_grid(draw, width, height, cell_size=CELL_SIZE, border=BORDER):
     """
     Draw light and heavy grid lines.
     """
 
-    total_width = width * CELL_SIZE
-    total_height = height * CELL_SIZE
+    total_width = width * cell_size
+    total_height = height * cell_size
 
     # Vertical lines
     for col in range(width + 1):
 
-        x = BORDER + col * CELL_SIZE
+        x = border + col * cell_size
 
         if col % HEAVY_GRID_EVERY == 0:
             color = HEAVY_GRID_COLOR
@@ -174,9 +182,9 @@ def draw_grid(draw, width, height):
         draw.line(
             (
                 x,
-                BORDER,
+                border,
                 x,
-                BORDER + total_height,
+                border + total_height,
             ),
             fill=color,
             width=line_width,
@@ -185,7 +193,7 @@ def draw_grid(draw, width, height):
     # Horizontal lines
     for row in range(height + 1):
 
-        y = BORDER + row * CELL_SIZE
+        y = border + row * cell_size
 
         if row % HEAVY_GRID_EVERY == 0:
             color = HEAVY_GRID_COLOR
@@ -196,9 +204,9 @@ def draw_grid(draw, width, height):
 
         draw.line(
             (
-                BORDER,
+                border,
                 y,
-                BORDER + total_width,
+                border + total_width,
                 y,
             ),
             fill=color,
@@ -250,17 +258,19 @@ def draw_title(
     )
 
 
-def draw_row_labels(draw, font, height, row_offset=0):
+def draw_row_labels(
+    draw, font, height, row_offset=0, cell_size=CELL_SIZE, border=BORDER,
+):
     """
     Draw row numbers.
     """
 
     for row in range(height):
 
-        y = BORDER + row * CELL_SIZE + CELL_SIZE / 2
+        y = border + row * cell_size + cell_size / 2
 
         draw.text(
-            (BORDER - 12, y),
+            (border - 12, y),
             str(row + row_offset + 1),
             anchor="rm",
             font=font,
@@ -282,17 +292,19 @@ def excel_column_name(index):
     return result
 
 
-def draw_column_labels(draw, font, width, col_offset=0):
+def draw_column_labels(
+    draw, font, width, col_offset=0, cell_size=CELL_SIZE, border=BORDER,
+):
     """
     Draw column letters.
     """
 
     for col in range(width):
 
-        x = BORDER + col * CELL_SIZE + CELL_SIZE / 2
+        x = border + col * cell_size + cell_size / 2
 
         draw.text(
-            (x, BORDER - 4),
+            (x, border - 4),
             excel_column_name(col + col_offset),
             anchor="ms",
             font=font,

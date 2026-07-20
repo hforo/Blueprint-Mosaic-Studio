@@ -12,6 +12,8 @@ __pycache__/
 
 # Output
 output/
+build/
+dist/
 
 # OS
 .DS_Store

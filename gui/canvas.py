@@ -7,9 +7,15 @@ from pathlib import Path
 from PySide6.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import (
     QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QMouseEvent,
-    QImageReader, QPainter, QPixmap, QTransform, QWheelEvent,
+    QBrush, QImage, QImageReader, QPainter, QPainterPath, QPen, QPixmap,
+    QTransform, QWheelEvent,
 )
-from PySide6.QtWidgets import QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
+from PySide6.QtWidgets import (
+    QGraphicsPathItem,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
+)
 
 from .crop_item import CropItem
 from .viewport import ViewportModel
@@ -60,6 +66,7 @@ class CanvasView(QGraphicsView):
     image_changed = Signal(str, int, int)
     crop_changed = Signal(QRectF)
     mouse_position_changed = Signal(QPointF)
+    image_clicked = Signal(QPointF)
     image_load_failed = Signal(str)
 
     MIN_ZOOM = 0.02
@@ -75,8 +82,11 @@ class CanvasView(QGraphicsView):
         self.setScene(self.canvas_scene)
         self.image_item: QGraphicsPixmapItem | None = None
         self.crop_item: CropItem | None = None
+        self.highlight_item: QGraphicsPathItem | None = None
+        self.grid_items: list[QGraphicsPathItem] = []
         self._panning = False
         self._pan_start = QPoint()
+        self._preview_source_state: tuple[str, QRectF] | None = None
 
         self.setRenderHints(
             QPainter.RenderHint.Antialiasing
@@ -91,6 +101,9 @@ class CanvasView(QGraphicsView):
         self.setFrameShape(QGraphicsView.Shape.NoFrame)
 
     def load_image(self, filename: str | Path) -> bool:
+        self._preview_source_state = None
+        self.highlight_item = None
+        self.grid_items = []
         path = Path(filename).expanduser().resolve()
         # Qt rejects images whose uncompressed source exceeds its conservative
         # default, even when the reader is asked for a scaled preview.
@@ -136,6 +149,145 @@ class CanvasView(QGraphicsView):
         self.crop_changed.emit(QRectF(image_rect))
         return True
 
+    def set_highlight_rects(self, rectangles: list[QRectF]) -> None:
+        """Highlight a collection of image-space rectangles as one scene item."""
+        self.clear_highlights()
+        if not rectangles:
+            return
+        path = QPainterPath()
+        for rectangle in rectangles:
+            path.addRect(rectangle)
+        item = QGraphicsPathItem(path)
+        pen = QPen(QColor(255, 75, 20), 2.0)
+        pen.setCosmetic(True)
+        item.setPen(pen)
+        item.setBrush(QBrush(QColor(255, 215, 0, 105)))
+        item.setZValue(100)
+        self.canvas_scene.addItem(item)
+        self.highlight_item = item
+
+    def clear_highlights(self) -> None:
+        if self.highlight_item is not None:
+            if self.highlight_item.scene() is self.canvas_scene:
+                self.canvas_scene.removeItem(self.highlight_item)
+            self.highlight_item = None
+
+    def set_mosaic_grid(
+        self,
+        columns: int,
+        rows: int,
+        origin: QPointF,
+        cell_size: float,
+        heavy_every: int = 4,
+    ) -> None:
+        """Draw a cosmetic vector grid that stays visible at every zoom."""
+        self.clear_mosaic_grid()
+        if columns <= 0 or rows <= 0 or cell_size <= 0:
+            return
+        light_path = QPainterPath()
+        heavy_path = QPainterPath()
+        width = columns * cell_size
+        height = rows * cell_size
+        for column in range(columns + 1):
+            x = origin.x() + column * cell_size
+            path = heavy_path if column % heavy_every == 0 else light_path
+            path.moveTo(x, origin.y())
+            path.lineTo(x, origin.y() + height)
+        for row in range(rows + 1):
+            y = origin.y() + row * cell_size
+            path = heavy_path if row % heavy_every == 0 else light_path
+            path.moveTo(origin.x(), y)
+            path.lineTo(origin.x() + width, y)
+
+        for path, color, line_width in (
+            (light_path, QColor(80, 80, 80, 210), 1.0),
+            (heavy_path, QColor(10, 10, 10, 235), 2.0),
+        ):
+            item = QGraphicsPathItem(path)
+            pen = QPen(color, line_width)
+            pen.setCosmetic(True)
+            item.setPen(pen)
+            item.setBrush(Qt.BrushStyle.NoBrush)
+            item.setZValue(50)
+            self.canvas_scene.addItem(item)
+            self.grid_items.append(item)
+
+    def clear_mosaic_grid(self) -> None:
+        for item in self.grid_items:
+            if item.scene() is self.canvas_scene:
+                self.canvas_scene.removeItem(item)
+        self.grid_items.clear()
+
+    @property
+    def source_image_path(self) -> str | None:
+        if self._preview_source_state is not None:
+            return self._preview_source_state[0]
+        return self.model.image_path
+
+    def source_crop_rect(self) -> QRectF:
+        if self._preview_source_state is not None:
+            return QRectF(self._preview_source_state[1])
+        return self.crop_rect()
+
+    def show_preview(self, filename: str | Path) -> bool:
+        """Show a generated artifact without replacing the editable source."""
+        source_state = self._preview_source_state
+        if source_state is None:
+            if not self.model.has_image or self.model.image_path is None:
+                return False
+            source_state = (self.model.image_path, self.crop_rect())
+        if not self.load_image(filename):
+            self._preview_source_state = source_state
+            return False
+        self._preview_source_state = source_state
+        if self.crop_item is not None:
+            self.canvas_scene.removeItem(self.crop_item)
+            self.crop_item = None
+        self.model.crop_rect = QRectF()
+        self.canvas_scene.set_overlay_geometry(self.model.image_rect, QRectF())
+        self.crop_changed.emit(QRectF())
+        return True
+
+    def show_live_preview(self, image: QImage) -> bool:
+        """Display an in-memory preview while retaining source and crop state."""
+        if image.isNull():
+            return False
+        source_state = self._preview_source_state
+        if source_state is None:
+            if not self.model.has_image or self.model.image_path is None:
+                return False
+            source_state = (self.model.image_path, self.crop_rect())
+
+        self.canvas_scene.clear()
+        self.highlight_item = None
+        self.grid_items = []
+        self.crop_item = None
+        pixmap = QPixmap.fromImage(image)
+        self.image_item = self.canvas_scene.addPixmap(pixmap)
+        self.image_item.setZValue(0)
+        image_rect = QRectF(0.0, 0.0, image.width(), image.height())
+        self.canvas_scene.setSceneRect(image_rect)
+        self.model.reset(source_state[0], image_rect)
+        self.model.crop_rect = QRectF()
+        self._preview_source_state = source_state
+        self.canvas_scene.set_overlay_geometry(image_rect, QRectF())
+        self.fit_to_window()
+        self.crop_changed.emit(QRectF())
+        return True
+
+    def restore_source_image(self) -> bool:
+        """Return from artifact preview to the original image and crop."""
+        if self._preview_source_state is None:
+            return False
+        source_path, crop_rect = self._preview_source_state
+        self._preview_source_state = None
+        if not self.load_image(source_path):
+            self._preview_source_state = (source_path, crop_rect)
+            return False
+        if self.crop_item is not None:
+            self.crop_item.set_crop_rect(crop_rect)
+        return True
+
     def fit_to_window(self) -> None:
         if not self.model.has_image:
             return
@@ -176,6 +328,10 @@ class CanvasView(QGraphicsView):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
+        if event.button() == Qt.MouseButton.LeftButton:
+            scene_position = self.mapToScene(event.position().toPoint())
+            if self.model.image_rect.contains(scene_position):
+                self.image_clicked.emit(scene_position)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
