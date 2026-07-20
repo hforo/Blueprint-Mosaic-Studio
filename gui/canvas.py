@@ -244,6 +244,9 @@ class CanvasView(QGraphicsView):
         if not self.load_image(filename):
             self._preview_source_state = source_state
             return False
+        # Generated mosaics contain hard pixel and grid edges. Smooth scaling
+        # creates bright/dark ringing that looks like extra duplicate lines.
+        self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
         self._preview_source_state = source_state
         if self.crop_item is not None:
             self.canvas_scene.removeItem(self.crop_item)

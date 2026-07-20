@@ -388,6 +388,7 @@ def render_master(
     show_labels=True,
     show_annotations=True,
     label_overrides=None,
+    show_grid=True,
 ):
     """
     Render the complete master blueprint.
@@ -465,11 +466,12 @@ def render_master(
     # Grid
     # ------------------------------------------------------
 
-    draw_grid(
-        draw,
-        width,
-        height,
-    )
+    if show_grid:
+        draw_grid(
+            draw,
+            width,
+            height,
+        )
     draw.rectangle(
         (BORDER, BORDER, BORDER + image_width, BORDER + image_height),
         outline="black",

@@ -768,6 +768,7 @@ class MainWindow(QMainWindow):
                 filename_tag="OriginalColors_NoCellLabels",
                 title_suffix="Original Colors — No Cell Labels",
                 show_labels=False,
+                show_grid=False,
             )
             advance(4, f"Rendering numbered {paint_company} blueprint...")
             render_master(
@@ -791,6 +792,7 @@ class MainWindow(QMainWindow):
                 palette_color_count=len(paint_plan.rows),
                 title_suffix=f"{paint_company} — No Cell Labels",
                 show_labels=False,
+                show_grid=False,
             )
             self._sherwin_preview_path = blueprint_output_path(
                 project,
@@ -1217,13 +1219,6 @@ class MainWindow(QMainWindow):
                 self.message_label.setText(
                     "Previewing unlabeled Sherwin-Williams colors"
                 )
-                if self._active_project is not None:
-                    self.canvas.set_mosaic_grid(
-                        self._active_project.width,
-                        self._active_project.height,
-                        QPointF(BORDER, BORDER),
-                        CELL_SIZE,
-                    )
                 if widget is self.sidebar.summary_panel:
                     self._highlight_summary_color(
                         self.sidebar.summary_panel.selected_palette_numbers()
@@ -1245,13 +1240,6 @@ class MainWindow(QMainWindow):
                 and current_source == self._sherwin_preview_source
                 and self.canvas.show_preview(self._sherwin_preview_path)
             ):
-                if self._active_project is not None:
-                    self.canvas.set_mosaic_grid(
-                        self._active_project.width,
-                        self._active_project.height,
-                        QPointF(BORDER, BORDER),
-                        CELL_SIZE,
-                    )
                 self.message_label.setText(
                     "Previewing Sherwin-Williams build mosaic"
                 )
@@ -1397,13 +1385,10 @@ class MainWindow(QMainWindow):
                 palette_color_count=len(self._active_paint_plan.rows),
                 title_suffix="Sherwin-Williams — No Cell Labels",
                 show_labels=False,
+                show_grid=False,
             )
             if self._sherwin_preview_path is not None:
                 self.canvas.show_preview(self._sherwin_preview_path)
-                self.canvas.set_mosaic_grid(
-                    self._active_project.width, self._active_project.height,
-                    QPointF(BORDER, BORDER), CELL_SIZE,
-                )
 
     def _render_edited_preview(self) -> None:
         if self._active_project is None or self._active_paint_plan is None:
@@ -1415,13 +1400,10 @@ class MainWindow(QMainWindow):
             palette_color_count=len(self._active_paint_plan.rows),
             title_suffix="Sherwin-Williams - No Cell Labels",
             show_labels=False,
+            show_grid=False,
         )
         if self._sherwin_preview_path is not None:
             self.canvas.show_preview(self._sherwin_preview_path)
-            self.canvas.set_mosaic_grid(
-                self._active_project.width, self._active_project.height,
-                QPointF(BORDER, BORDER), CELL_SIZE,
-            )
 
     @Slot(object)
     def _highlight_summary_color(self, palette_numbers: object) -> None:
