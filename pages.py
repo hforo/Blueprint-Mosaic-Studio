@@ -148,6 +148,16 @@ def render_pages(
                 draw, width, height,
                 cell_size=PAGE_CELL_SIZE, border=page_border,
             )
+            draw.rectangle(
+                (
+                    page_border,
+                    page_border,
+                    page_border + width * PAGE_CELL_SIZE,
+                    page_border + height * PAGE_CELL_SIZE,
+                ),
+                outline="black",
+                width=2,
+            )
             draw_row_labels(
                 draw,
                 cell_font,
@@ -281,6 +291,17 @@ def render_location_thumbnail(
     offset_x = (OVERVIEW_SIZE[0] - contained.width) // 2
     offset_y = (OVERVIEW_SIZE[1] - contained.height) // 2
     overview.paste(contained, (offset_x, offset_y))
+    overview_draw = ImageDraw.Draw(overview)
+    overview_draw.rectangle(
+        (
+            offset_x,
+            offset_y,
+            offset_x + contained.width - 1,
+            offset_y + contained.height - 1,
+        ),
+        outline="black",
+        width=1,
+    )
 
     scale_x = contained.width / project.width
     scale_y = contained.height / project.height

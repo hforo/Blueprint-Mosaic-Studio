@@ -92,6 +92,11 @@ class PreviewWorker(QRunnable):
                     (source.width * scale, source.height * scale),
                     PILImage.Resampling.NEAREST,
                 )
+            PILImageDraw.Draw(mosaic).rectangle(
+                (0, 0, mosaic.width - 1, mosaic.height - 1),
+                outline="black",
+                width=max(1, scale // 8),
+            )
         except (OSError, ValueError):
             return
         self.signals.ready.emit(
@@ -1269,9 +1274,12 @@ class MainWindow(QMainWindow):
             self.sidebar.live_preview.setChecked(False)
             self.canvas.show_preview(self._numbered_preview_path)
 
-    @Slot(int)
-    def _choose_paint_override(self, palette_number: int) -> None:
+    @Slot(object)
+    def _choose_paint_override(self, palette_numbers: object) -> None:
         if self._active_project is None:
+            return
+        numbers = tuple(int(number) for number in palette_numbers)
+        if not numbers:
             return
         query, accepted = QInputDialog.getText(
             self, f"Choose {self.sidebar.matcher.catalog_name} paint",
@@ -1290,7 +1298,8 @@ class MainWindow(QMainWindow):
         if not accepted:
             return
         paint = matches[labels.index(label)]
-        self.sidebar.paint_overrides[palette_number] = paint.code
+        for palette_number in numbers:
+            self.sidebar.paint_overrides[palette_number] = paint.code
         self._rebuild_paint_plan()
 
     @Slot(object)

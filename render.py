@@ -122,7 +122,9 @@ def draw_tile_fill(draw, x, y, size, fill_rgb, tile_type):
         )
     elif tile_type == "4-piece 5.56 cartridge tile" and size >= 4:
         half = size / 2
-        inset = max(1, round(size * 0.04))
+        # Keep the four cartridge ends almost tangent. At thumbnail scale they
+        # touch; larger renders retain only a hairline of visible backing.
+        inset = max(0, round(size * 0.01))
         for tile_row in range(2):
             for tile_column in range(2):
                 draw.ellipse(
@@ -461,6 +463,11 @@ def render_master(
         draw,
         width,
         height,
+    )
+    draw.rectangle(
+        (BORDER, BORDER, BORDER + image_width, BORDER + image_height),
+        outline="black",
+        width=max(2, GRID_LINE_WIDTH),
     )
 
     # ------------------------------------------------------

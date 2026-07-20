@@ -31,7 +31,7 @@ class PalettePanel(QWidget):
     """Number-to-color legend for the currently generated mosaic."""
 
     color_selected = Signal(object)
-    paint_override_requested = Signal(int)
+    paint_override_requested = Signal(object)
     paint_unlock_requested = Signal(object)
     merge_requested = Signal(object)
 
@@ -134,30 +134,43 @@ class PalettePanel(QWidget):
         paint_estimator: PaintUsageEstimator,
         paint_plan: SherwinWilliamsPaintPlan,
     ) -> None:
-        """Display palette colors using the same numbers as the mosaic cells."""
+        """Display one row for each matched manufacturer paint color."""
         self.table.setUpdatesEnabled(False)
-        self.table.setRowCount(len(palette))
         total_tiles = sum(color_counts.values())
+        groups = {}
+        for palette_number in sorted(palette):
+            matched_code = paint_plan.matches[palette_number].color.code
+            groups.setdefault(matched_code, []).append(palette_number)
+        self.table.setRowCount(len(groups))
 
-        for row, color_number in enumerate(sorted(palette)):
+        for row, color_numbers in enumerate(groups.values()):
+            color_number = color_numbers[0]
             red, green, blue = palette[color_number]
             color = QColor(red, green, blue)
             paint_match = paint_plan.matches[color_number]
             paint = paint_match.color
             match_color = QColor(*paint.rgb)
-            number_item = QTableWidgetItem(str(color_number))
-            number_item.setData(Qt.ItemDataRole.UserRole, color_number)
+            number_text = ", ".join(str(number) for number in color_numbers)
+            number_item = QTableWidgetItem(number_text)
+            number_item.setData(Qt.ItemDataRole.UserRole, tuple(color_numbers))
+            number_item.setToolTip(f"Mosaic colors {number_text}")
             number_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             swatch_item = QTableWidgetItem()
             swatch_item.setBackground(color)
-            swatch_item.setToolTip(color.name(QColor.NameFormat.HexRgb).upper())
+            source_hexes = [
+                QColor(*palette[number]).name(QColor.NameFormat.HexRgb).upper()
+                for number in color_numbers
+            ]
+            swatch_item.setToolTip("Source colors: " + ", ".join(source_hexes))
 
             value_item = QTableWidgetItem(
                 f"{color.name(QColor.NameFormat.HexRgb).upper()}\n"
                 f"RGB {red}, {green}, {blue}"
             )
-            tile_count = color_counts.get(color_number, 0)
+            tile_count = sum(
+                color_counts.get(number, 0) for number in color_numbers
+            )
             count_item = QTableWidgetItem(f"{tile_count:,}")
             count_item.setTextAlignment(Qt.AlignmentFlag.AlignRight)
             paint_estimate = paint_estimator.estimate(tile_count)
@@ -209,13 +222,17 @@ class PalettePanel(QWidget):
         for index in self.table.selectionModel().selectedRows(0):
             item = self.table.item(index.row(), 0)
             if item is not None:
-                numbers.add(int(item.data(Qt.ItemDataRole.UserRole)))
+                value = item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(value, (tuple, list)):
+                    numbers.update(int(number) for number in value)
+                else:
+                    numbers.add(int(value))
         return tuple(sorted(numbers))
 
     def _request_paint_override(self) -> None:
         numbers = self.selected_palette_numbers()
         if numbers:
-            self.paint_override_requested.emit(numbers[0])
+            self.paint_override_requested.emit(numbers)
 
     def _emit_selected_colors(self) -> None:
         self.color_selected.emit(self.selected_palette_numbers())
